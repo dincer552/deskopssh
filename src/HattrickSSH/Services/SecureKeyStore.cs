@@ -11,7 +11,7 @@ public sealed class SecureKeyStore(LocalStore store)
         var raw = File.ReadAllBytes(sourcePath);
         var text = Encoding.UTF8.GetString(raw);
         if (!text.Contains("PRIVATE KEY", StringComparison.OrdinalIgnoreCase) &&
-            !text.Contains("PuTTY-User-Key-File", StringComparison.OrdinalIgnoreCase))
+            false)
             throw new InvalidDataException("Dosya tanınan bir SSH private key biçiminde değil.");
         var id = Guid.NewGuid().ToString("N");
         var protectedBytes = ProtectedData.Protect(raw, Entropy, DataProtectionScope.CurrentUser);
