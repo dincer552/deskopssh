@@ -201,6 +201,40 @@
             </Border>
           </Grid>
 
+          <Grid x:Name="HistoryWorkspace" Visibility="Collapsed">
+            <Border Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="10" Padding="14">
+              <DockPanel>
+                <Grid DockPanel.Dock="Top" Margin="2,0,2,12">
+                  <StackPanel>
+                    <TextBlock Text="BAĞLANTI GEÇMİŞİ" FontSize="11" FontWeight="Bold" Foreground="{StaticResource MutedBrush}"/>
+                    <TextBlock Text="Yalnızca oturum meta verileri saklanır; komutlar ve terminal çıktısı kaydedilmez." FontSize="10" Foreground="{StaticResource MutedBrush}" Margin="0,4,0,0"/>
+                  </StackPanel>
+                  <Button Content="Geçmişi temizle" HorizontalAlignment="Right" Click="ClearHistory_Click"/>
+                </Grid>
+                <ListBox x:Name="HistoryList" Background="Transparent" BorderThickness="0" Foreground="{StaticResource TextBrush}">
+                  <ListBox.ItemTemplate>
+                    <DataTemplate>
+                      <Border Background="#121D26" BorderBrush="#263947" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,2">
+                        <Grid>
+                          <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                          <StackPanel>
+                            <TextBlock Text="{Binding ProfileName}" FontWeight="SemiBold" FontSize="13"/>
+                            <TextBlock Text="{Binding DetailLabel}" FontSize="10" Foreground="{StaticResource MutedBrush}" Margin="0,4,0,0"/>
+                            <TextBlock Text="{Binding TimeLabel}" FontSize="10" Foreground="{StaticResource MutedBrush}" Margin="0,3,0,0"/>
+                          </StackPanel>
+                          <StackPanel Grid.Column="1" VerticalAlignment="Center" HorizontalAlignment="Right">
+                            <TextBlock Text="{Binding Status}" Foreground="#42D995" FontWeight="SemiBold" FontSize="11" HorizontalAlignment="Right"/>
+                            <TextBlock Text="{Binding EndLabel}" Foreground="{StaticResource MutedBrush}" FontSize="10" HorizontalAlignment="Right" Margin="0,4,0,0"/>
+                          </StackPanel>
+                        </Grid>
+                      </Border>
+                    </DataTemplate>
+                  </ListBox.ItemTemplate>
+                </ListBox>
+              </DockPanel>
+            </Border>
+          </Grid>
+
           <Grid x:Name="InfoWorkspace" Visibility="Collapsed">
             <Border Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="10" Padding="24" HorizontalAlignment="Left" VerticalAlignment="Top" Width="700">
               <StackPanel>
