@@ -8,4 +8,11 @@ public sealed class AppSettings
     public bool CheckUpdatesOnStartup { get; set; } = true;
     public bool AutoReconnect { get; set; } = false;
     public int KeepAliveSeconds { get; set; } = 30;
+    public List<CommandSnippet> Snippets { get; set; } =
+    [
+        new() { Name = "hostname", Command = "hostname" },
+        new() { Name = "whoami", Command = "whoami" },
+        new() { Name = "Disk", Command = "df -h /" },
+        new() { Name = "Bellek", Command = "free -h" }
+    ];
 }
