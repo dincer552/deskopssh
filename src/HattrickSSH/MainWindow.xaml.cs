@@ -53,6 +53,8 @@ public partial class MainWindow : Window
                 CoreWebView2HostResourceAccessKind.Allow);
             TerminalWeb.CoreWebView2.Navigate("https://hssh.local/index.html");
             terminalReady = true;
+            await ApplyTerminalSettingsAsync();
+            await TerminalWeb.ExecuteScriptAsync($"window.hsshSetScrollback({settings.TerminalScrollback});");
             await WriteTerminalAsync("Hattrick SSH • Güvenli terminal hazır\r\nSunucu profili seçip Bağlan düğmesine basın.\r\n\r\n");
         }
         catch (Exception ex)
@@ -326,24 +328,27 @@ public partial class MainWindow : Window
             var alias = "hssh-" + profile.Id;
             var args = $"-tt -F {QuoteArgument(configPath)} {alias}";
             session = PseudoConsoleSession.Start(ssh, args, 120, 34);
-            session.OutputReceived += bytes =>
+            var startedSession = session;
+            startedSession.OutputReceived += bytes =>
             {
                 var base64 = Convert.ToBase64String(bytes);
-                Dispatcher.BeginInvoke(() =>
+                Dispatcher.BeginInvoke(new Action(() =>
                 {
                     if (TerminalWeb.CoreWebView2 is not null)
                         TerminalWeb.CoreWebView2.PostWebMessageAsString(base64);
-                });
+                }));
             };
-            session.Exited += code => Dispatcher.BeginInvoke(() =>
+            startedSession.Exited += code => Dispatcher.BeginInvoke(new Action(() =>
             {
+                if (!ReferenceEquals(session, startedSession)) return;
+                startedSession.Dispose();
                 ConnectionDot.Fill = (Brush)FindResource("MutedBrush");
                 ConnectionStatus.Text = $"● SSH işlemi sona erdi (çıkış kodu {code}). Yeniden bağlanabilirsiniz.";
                 FooterRight.Text = "Oturum kapandı";
                 keyStore.DeleteTemporaryKey(temporaryKeyPath);
                 temporaryKeyPath = null;
                 session = null;
-            });
+            }));
 
             ConnectionDot.Fill = (Brush)FindResource("GreenBrush");
             ConnectionStatus.Text = profile.UseCloudflareAccess
@@ -466,6 +471,7 @@ public partial class MainWindow : Window
         settings.CheckUpdatesOnStartup = AutoUpdateCheck.IsChecked == true;
         store.SaveSettings(settings);
         _ = ApplyTerminalSettingsAsync();
+        if (terminalReady) _ = TerminalWeb.ExecuteScriptAsync($"window.hsshSetScrollback({settings.TerminalScrollback});");
         MessageBox.Show("Tercihler kaydedildi.", "Hattrick SSH", MessageBoxButton.OK, MessageBoxImage.Information);
     }
 
