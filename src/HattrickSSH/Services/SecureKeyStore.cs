@@ -9,14 +9,38 @@ public sealed class SecureKeyStore(LocalStore store)
     public string Import(string sourcePath)
     {
         var raw = File.ReadAllBytes(sourcePath);
-        var text = Encoding.UTF8.GetString(raw);
-        if (!text.Contains("PRIVATE KEY", StringComparison.OrdinalIgnoreCase))
-            throw new InvalidDataException("Dosya tanınan bir SSH private key biçiminde değil.");
-        var id = Guid.NewGuid().ToString("N");
-        var protectedBytes = ProtectedData.Protect(raw, Entropy, DataProtectionScope.CurrentUser);
-        File.WriteAllBytes(Path.Combine(store.KeyDirectory, id + ".dpapi"), protectedBytes);
-        CryptographicOperations.ZeroMemory(raw);
-        return id;
+        byte[]? protectedBytes = null;
+        try
+        {
+            var text = Encoding.UTF8.GetString(raw);
+            if (!text.Contains("PRIVATE KEY", StringComparison.OrdinalIgnoreCase))
+                throw new InvalidDataException("Dosya tanınan bir OpenSSH private key biçiminde değil.");
+            var id = Guid.NewGuid().ToString("N");
+            protectedBytes = ProtectedData.Protect(raw, Entropy, DataProtectionScope.CurrentUser);
+            File.WriteAllBytes(Path.Combine(store.KeyDirectory, id + ".dpapi"), protectedBytes);
+            return id;
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(raw);
+            if (protectedBytes is not null) CryptographicOperations.ZeroMemory(protectedBytes);
+        }
+    }
+
+    public void CleanupStaleTemporaryKeys(TimeSpan? minimumAge = null)
+    {
+        var root = Path.Combine(Path.GetTempPath(), "HattrickSSH");
+        if (!Directory.Exists(root)) return;
+        var cutoff = DateTime.UtcNow - (minimumAge ?? TimeSpan.FromDays(1));
+        foreach (var directory in Directory.EnumerateDirectories(root))
+        {
+            try
+            {
+                if (Directory.GetLastWriteTimeUtc(directory) < cutoff)
+                    Directory.Delete(directory, recursive: true);
+            }
+            catch { /* A live SSH process may still own the temporary identity. */ }
+        }
     }
 
     public string CreateTemporaryKey(string keyId)
