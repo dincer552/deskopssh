@@ -3,11 +3,11 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf"
         Title="Hattrick SSH" Width="1440" Height="900" MinWidth="1080" MinHeight="680"
-        WindowStartupLocation="CenterScreen" Background="{StaticResource BgBrush}"
-        Foreground="{StaticResource TextBrush}" Loaded="Window_Loaded" Closing="Window_Closing">
+        WindowStartupLocation="CenterScreen" Background="{DynamicResource BgBrush}"
+        Foreground="{DynamicResource TextBrush}" Loaded="Window_Loaded" Closing="Window_Closing">
   <Grid>
     <Grid.RowDefinitions><RowDefinition Height="56"/><RowDefinition Height="*"/><RowDefinition Height="30"/></Grid.RowDefinitions>
-    <Border Grid.Row="0" Background="#0D131A" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,0,1">
+    <Border Grid.Row="0" Background="#0D131A" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1">
       <Grid Margin="18,0">
         <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
@@ -16,11 +16,11 @@
           </Border>
           <StackPanel>
             <TextBlock Text="HATTRICK SSH" FontWeight="Bold" FontSize="15" Foreground="#F1F5F9"/>
-            <TextBlock Text="Secure remote workspace" FontSize="10" Foreground="{StaticResource MutedBrush}"/>
+            <TextBlock Text="Secure remote workspace" FontSize="10" Foreground="{DynamicResource MutedBrush}"/>
           </StackPanel>
         </StackPanel>
         <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-          <TextBlock x:Name="VersionLabel" Text="v0.1.0" Foreground="{StaticResource MutedBrush}" FontSize="11" VerticalAlignment="Center" Margin="0,0,15,0"/>
+          <TextBlock x:Name="VersionLabel" Text="v0.1.0" Foreground="{DynamicResource MutedBrush}" FontSize="11" VerticalAlignment="Center" Margin="0,0,15,0"/>
           <Button Content="—" Width="36" Padding="4" Click="Minimize_Click"/>
           <Button Content="□" Width="36" Padding="4" Margin="5,0,0,0" Click="Maximize_Click"/>
           <Button Content="×" Width="36" Padding="4" Margin="5,0,0,0" Click="Close_Click"/>
@@ -30,7 +30,7 @@
 
     <Grid Grid.Row="1">
       <Grid.ColumnDefinitions><ColumnDefinition Width="218"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-      <Border Grid.Column="0" Background="#0D141B" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,1,0">
+      <Border Grid.Column="0" Background="#0D141B" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,1,0">
         <DockPanel Margin="12,14">
           <StackPanel DockPanel.Dock="Top">
             <TextBlock Text="WORKSPACE" FontSize="10" FontWeight="Bold" Foreground="#68798A" Margin="10,6,0,10"/>
@@ -50,7 +50,7 @@
             <Border Background="#131D26" CornerRadius="8" Padding="10" Margin="2,16,2,4">
               <StackPanel>
                 <TextBlock Text="LOCAL-FIRST" Foreground="#3DE69B" FontSize="10" FontWeight="Bold"/>
-                <TextBlock Text="Anahtarlar bu Windows hesabında şifreli saklanır." TextWrapping="Wrap" Foreground="{StaticResource MutedBrush}" FontSize="10" Margin="0,5,0,0"/>
+                <TextBlock Text="Anahtarlar bu Windows hesabında şifreli saklanır." TextWrapping="Wrap" Foreground="{DynamicResource MutedBrush}" FontSize="10" Margin="0,5,0,0"/>
               </StackPanel>
             </Border>
           </StackPanel>
@@ -62,7 +62,7 @@
         <Grid Grid.Row="0">
           <StackPanel Orientation="Vertical" VerticalAlignment="Center">
             <TextBlock x:Name="PageTitle" Text="Sunucular" FontSize="18" FontWeight="SemiBold"/>
-            <TextBlock x:Name="PageSubtitle" Text="SSH bağlantılarını yönet ve terminal oturumu aç." FontSize="11" Foreground="{StaticResource MutedBrush}" Margin="0,3,0,0"/>
+            <TextBlock x:Name="PageSubtitle" Text="SSH bağlantılarını yönet ve terminal oturumu aç." FontSize="11" Foreground="{DynamicResource MutedBrush}" Margin="0,3,0,0"/>
           </StackPanel>
           <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
             <Button Content="＋ Sunucu ekle" Click="AddProfile_Click" Background="#1A302B" BorderBrush="#2D805E" Margin="0,0,8,0"/>
@@ -73,28 +73,28 @@
         <Grid Grid.Row="1">
           <Grid x:Name="ServerWorkspace">
             <Grid.ColumnDefinitions><ColumnDefinition Width="268"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-            <Border Grid.Column="0" Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="10" Margin="0,0,12,0">
+            <Border Grid.Column="0" Background="{DynamicResource PanelBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="10" Margin="0,0,12,0">
               <DockPanel Margin="10">
                 <Grid DockPanel.Dock="Top" Margin="2,2,2,9">
-                  <TextBlock Text="BAĞLANTI PROFİLLERİ" FontWeight="Bold" FontSize="10" Foreground="{StaticResource MutedBrush}" VerticalAlignment="Center"/>
+                  <TextBlock Text="BAĞLANTI PROFİLLERİ" FontWeight="Bold" FontSize="10" Foreground="{DynamicResource MutedBrush}" VerticalAlignment="Center"/>
                   <Button Content="＋" Width="28" Padding="2" HorizontalAlignment="Right" Click="AddProfile_Click"/>
                 </Grid>
                 <TextBox x:Name="ProfileSearchBox" ToolTip="Profil adı, adres, kullanıcı veya grup ara" TextChanged="ProfileSearch_TextChanged" Margin="2,0,2,8" Height="34" VerticalContentAlignment="Center"/>
-                <ListBox x:Name="ProfilesList" SelectionChanged="ProfilesList_SelectionChanged" Background="Transparent" BorderThickness="0" Foreground="{StaticResource TextBrush}">
+                <ListBox x:Name="ProfilesList" SelectionChanged="ProfilesList_SelectionChanged" Background="Transparent" BorderThickness="0" Foreground="{DynamicResource TextBrush}">
                   <ListBox.GroupStyle>
                     <GroupStyle>
                       <GroupStyle.HeaderTemplate>
-                        <DataTemplate><TextBlock Text="{Binding Name}" Foreground="{StaticResource MutedBrush}" FontSize="10" FontWeight="Bold" Margin="4,9,0,3"/></DataTemplate>
+                        <DataTemplate><TextBlock Text="{Binding Name}" Foreground="{DynamicResource MutedBrush}" FontSize="10" FontWeight="Bold" Margin="4,9,0,3"/></DataTemplate>
                       </GroupStyle.HeaderTemplate>
                     </GroupStyle>
                   </ListBox.GroupStyle>
                   <ListBox.ItemTemplate>
                     <DataTemplate>
-                      <Border Background="#121D26" BorderBrush="#263947" BorderThickness="1" CornerRadius="8" Padding="10" Margin="0,2">
+                      <Border Background="{DynamicResource Panel2Brush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="8" Padding="10" Margin="0,2">
                         <StackPanel>
                           <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="13"/>
-                          <TextBlock Text="{Binding Host}" FontSize="10" Foreground="{StaticResource MutedBrush}" Margin="0,4,0,0"/>
-                          <TextBlock Text="{Binding Username}" FontSize="10" Foreground="#42D995" Margin="0,2,0,0"/>
+                          <TextBlock Text="{Binding Host}" FontSize="10" Foreground="{DynamicResource MutedBrush}" Margin="0,4,0,0"/>
+                          <TextBlock Text="{Binding Username}" FontSize="10" Foreground="{DynamicResource GreenBrush}" Margin="0,2,0,0"/>
                         </StackPanel>
                       </Border>
                     </DataTemplate>
@@ -108,15 +108,15 @@
               </DockPanel>
             </Border>
 
-            <Border Grid.Column="1" Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="10">
+            <Border Grid.Column="1" Background="{DynamicResource PanelBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="10">
               <Grid>
                 <Grid.RowDefinitions><RowDefinition Height="46"/><RowDefinition Height="*"/><RowDefinition Height="42"/></Grid.RowDefinitions>
-                <Border Background="#131D26" CornerRadius="10,10,0,0" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,0,1">
+                <Border Background="#131D26" CornerRadius="10,10,0,0" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1">
                   <Grid Margin="12,0">
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                       <Ellipse x:Name="ConnectionDot" Width="8" Height="8" Fill="#637383" Margin="0,0,9,0"/>
                       <TextBlock x:Name="TerminalTitle" Text="Terminal • Bağlantı bekleniyor" FontWeight="SemiBold" FontSize="12"/>
-                      <TextBlock x:Name="TransportLabel" Text="   SSH" Foreground="{StaticResource MutedBrush}" FontSize="10" VerticalAlignment="Center"/>
+                      <TextBlock x:Name="TransportLabel" Text="   SSH" Foreground="{DynamicResource MutedBrush}" FontSize="10" VerticalAlignment="Center"/>
                     </StackPanel>
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                       <Button Content="A−" Width="38" Padding="4" Click="FontDown_Click" Margin="0,0,4,0"/>
@@ -144,27 +144,27 @@
           <ScrollViewer x:Name="SettingsWorkspace" Visibility="Collapsed" VerticalScrollBarVisibility="Auto">
             <StackPanel MaxWidth="850" HorizontalAlignment="Left">
               <TextBlock Text="Terminal ve uygulama tercihleri" FontSize="16" FontWeight="SemiBold" Margin="0,5,0,14"/>
-              <Border Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="10" Padding="18" Margin="0,0,0,12">
+              <Border Background="{DynamicResource PanelBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="10" Padding="18" Margin="0,0,0,12">
                 <StackPanel>
                   <TextBlock Text="Terminal" FontSize="14" FontWeight="SemiBold"/>
-                  <TextBlock Text="Tema" Foreground="{StaticResource MutedBrush}" Margin="0,12,0,4"/>
+                  <TextBlock Text="Tema" Foreground="{DynamicResource MutedBrush}" Margin="0,12,0,4"/>
                   <ComboBox x:Name="ThemeCombo" Width="220" HorizontalAlignment="Left">
                     <ComboBoxItem Content="Codex Dark"/>
                     <ComboBoxItem Content="Midnight Blue"/>
                     <ComboBoxItem Content="Dracula"/>
                     <ComboBoxItem Content="Classic Green"/>
                   </ComboBox>
-                  <TextBlock Text="Yazı boyutu" Foreground="{StaticResource MutedBrush}" Margin="0,12,0,4"/>
+                  <TextBlock Text="Yazı boyutu" Foreground="{DynamicResource MutedBrush}" Margin="0,12,0,4"/>
                   <StackPanel Orientation="Horizontal">
                     <TextBox x:Name="FontSizeBox" Width="90" Text="16"/>
-                    <TextBlock Text="px" Foreground="{StaticResource MutedBrush}" VerticalAlignment="Center" Margin="8,0"/>
+                    <TextBlock Text="px" Foreground="{DynamicResource MutedBrush}" VerticalAlignment="Center" Margin="8,0"/>
                   </StackPanel>
-                  <TextBlock Text="Kaydırma geçmişi satır sayısı" Foreground="{StaticResource MutedBrush}" Margin="0,12,0,4"/>
+                  <TextBlock Text="Kaydırma geçmişi satır sayısı" Foreground="{DynamicResource MutedBrush}" Margin="0,12,0,4"/>
                   <TextBox x:Name="ScrollbackBox" Width="120" Text="10000"/>
                   <CheckBox x:Name="AutoReconnectCheck" Content="Bağlantı koparsa otomatik yeniden bağlanmayı dene"/>
                 </StackPanel>
               </Border>
-              <Border Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="10" Padding="18" Margin="0,0,0,12">
+              <Border Background="{DynamicResource PanelBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="10" Padding="18" Margin="0,0,0,12">
                 <StackPanel>
                   <TextBlock Text="Güncellemeler" FontSize="14" FontWeight="SemiBold"/>
                   <CheckBox x:Name="AutoUpdateCheck" Content="Uygulama açıldığında GitHub Releases üzerinde güncelleme ara"/>
@@ -175,11 +175,11 @@
           </ScrollViewer>
 
           <Grid x:Name="UpdatesWorkspace" Visibility="Collapsed">
-            <Border Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="10" Padding="24" HorizontalAlignment="Left" VerticalAlignment="Top" Width="620">
+            <Border Background="{DynamicResource PanelBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="10" Padding="24" HorizontalAlignment="Left" VerticalAlignment="Top" Width="620">
               <StackPanel>
                 <TextBlock Text="Hattrick SSH güncelleyici" FontSize="16" FontWeight="SemiBold"/>
-                <TextBlock Text="Sürümler GitHub Releases üzerinden kontrol edilir. İndirilen kurulum dosyası çalıştırılmadan önce SHA-256 ile doğrulanır." TextWrapping="Wrap" Foreground="{StaticResource MutedBrush}" Margin="0,9,0,16"/>
-                <TextBlock x:Name="UpdateStatusText" Text="Güncelleme kontrolü bekleniyor." Foreground="{StaticResource MutedBrush}" Margin="0,0,0,14"/>
+                <TextBlock Text="Sürümler GitHub Releases üzerinden kontrol edilir. İndirilen kurulum dosyası çalıştırılmadan önce SHA-256 ile doğrulanır." TextWrapping="Wrap" Foreground="{DynamicResource MutedBrush}" Margin="0,9,0,16"/>
+                <TextBlock x:Name="UpdateStatusText" Text="Güncelleme kontrolü bekleniyor." Foreground="{DynamicResource MutedBrush}" Margin="0,0,0,14"/>
                 <StackPanel Orientation="Horizontal">
                   <Button Content="Güncellemeleri denetle" Click="CheckUpdates_Click" Background="#1A302B" BorderBrush="#2D805E"/>
                   <Button Content="GitHub Releases" Click="OpenReleases_Click" Margin="8,0,0,0"/>
@@ -189,24 +189,24 @@
           </Grid>
 
           <Grid x:Name="TunnelsWorkspace" Visibility="Collapsed">
-            <Border Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="10" Padding="20" HorizontalAlignment="Left" VerticalAlignment="Top" Width="720">
+            <Border Background="{DynamicResource PanelBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="10" Padding="20" HorizontalAlignment="Left" VerticalAlignment="Top" Width="720">
               <DockPanel>
                 <StackPanel DockPanel.Dock="Top">
                   <TextBlock Text="Yerel port yönlendirme" FontSize="16" FontWeight="SemiBold"/>
-                  <TextBlock Text="Bilgisayarındaki bir localhost portunu SSH sunucusu üzerinden hedef servise güvenli şekilde bağla." TextWrapping="Wrap" Foreground="{StaticResource MutedBrush}" Margin="0,8,0,14"/>
+                  <TextBlock Text="Bilgisayarındaki bir localhost portunu SSH sunucusu üzerinden hedef servise güvenli şekilde bağla." TextWrapping="Wrap" Foreground="{DynamicResource MutedBrush}" Margin="0,8,0,14"/>
                   <StackPanel Orientation="Horizontal" Margin="0,0,0,14">
                     <Button Content="＋ Yönlendirme ekle" Click="AddTunnel_Click" Background="#1A302B" BorderBrush="#2D805E" Margin="0,0,8,0"/>
                     <Button Content="Seçileni durdur" Click="StopTunnel_Click" Background="#382025" BorderBrush="#75414A"/>
                   </StackPanel>
-                  <TextBlock Text="AKTİF TÜNELLER" FontSize="10" FontWeight="Bold" Foreground="{StaticResource MutedBrush}" Margin="0,0,0,7"/>
+                  <TextBlock Text="AKTİF TÜNELLER" FontSize="10" FontWeight="Bold" Foreground="{DynamicResource MutedBrush}" Margin="0,0,0,7"/>
                 </StackPanel>
-                <ListBox x:Name="TunnelList" Background="Transparent" BorderThickness="0" Foreground="{StaticResource TextBrush}">
+                <ListBox x:Name="TunnelList" Background="Transparent" BorderThickness="0" Foreground="{DynamicResource TextBrush}">
                   <ListBox.ItemTemplate>
                     <DataTemplate>
                       <Border Background="#121D26" BorderBrush="#263947" BorderThickness="1" CornerRadius="8" Padding="11" Margin="0,2">
                         <StackPanel>
                           <TextBlock Text="{Binding Label}" FontWeight="SemiBold"/>
-                          <TextBlock Text="{Binding Details}" Foreground="{StaticResource MutedBrush}" FontSize="10" Margin="0,4,0,0"/>
+                          <TextBlock Text="{Binding Details}" Foreground="{DynamicResource MutedBrush}" FontSize="10" Margin="0,4,0,0"/>
                         </StackPanel>
                       </Border>
                     </DataTemplate>
@@ -217,16 +217,16 @@
           </Grid>
 
           <Grid x:Name="HistoryWorkspace" Visibility="Collapsed">
-            <Border Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="10" Padding="14">
+            <Border Background="{DynamicResource PanelBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="10" Padding="14">
               <DockPanel>
                 <Grid DockPanel.Dock="Top" Margin="2,0,2,12">
                   <StackPanel>
-                    <TextBlock Text="BAĞLANTI GEÇMİŞİ" FontSize="11" FontWeight="Bold" Foreground="{StaticResource MutedBrush}"/>
-                    <TextBlock Text="Yalnızca oturum meta verileri saklanır; komutlar ve terminal çıktısı kaydedilmez." FontSize="10" Foreground="{StaticResource MutedBrush}" Margin="0,4,0,0"/>
+                    <TextBlock Text="BAĞLANTI GEÇMİŞİ" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource MutedBrush}"/>
+                    <TextBlock Text="Yalnızca oturum meta verileri saklanır; komutlar ve terminal çıktısı kaydedilmez." FontSize="10" Foreground="{DynamicResource MutedBrush}" Margin="0,4,0,0"/>
                   </StackPanel>
                   <Button Content="Geçmişi temizle" HorizontalAlignment="Right" Click="ClearHistory_Click"/>
                 </Grid>
-                <ListBox x:Name="HistoryList" Background="Transparent" BorderThickness="0" Foreground="{StaticResource TextBrush}">
+                <ListBox x:Name="HistoryList" Background="Transparent" BorderThickness="0" Foreground="{DynamicResource TextBrush}">
                   <ListBox.ItemTemplate>
                     <DataTemplate>
                       <Border Background="#121D26" BorderBrush="#263947" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,2">
@@ -234,12 +234,12 @@
                           <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                           <StackPanel>
                             <TextBlock Text="{Binding ProfileName}" FontWeight="SemiBold" FontSize="13"/>
-                            <TextBlock Text="{Binding DetailLabel}" FontSize="10" Foreground="{StaticResource MutedBrush}" Margin="0,4,0,0"/>
-                            <TextBlock Text="{Binding TimeLabel}" FontSize="10" Foreground="{StaticResource MutedBrush}" Margin="0,3,0,0"/>
+                            <TextBlock Text="{Binding DetailLabel}" FontSize="10" Foreground="{DynamicResource MutedBrush}" Margin="0,4,0,0"/>
+                            <TextBlock Text="{Binding TimeLabel}" FontSize="10" Foreground="{DynamicResource MutedBrush}" Margin="0,3,0,0"/>
                           </StackPanel>
                           <StackPanel Grid.Column="1" VerticalAlignment="Center" HorizontalAlignment="Right">
                             <TextBlock Text="{Binding Status}" Foreground="#42D995" FontWeight="SemiBold" FontSize="11" HorizontalAlignment="Right"/>
-                            <TextBlock Text="{Binding EndLabel}" Foreground="{StaticResource MutedBrush}" FontSize="10" HorizontalAlignment="Right" Margin="0,4,0,0"/>
+                            <TextBlock Text="{Binding EndLabel}" Foreground="{DynamicResource MutedBrush}" FontSize="10" HorizontalAlignment="Right" Margin="0,4,0,0"/>
                           </StackPanel>
                         </Grid>
                       </Border>
@@ -251,10 +251,10 @@
           </Grid>
 
           <Grid x:Name="InfoWorkspace" Visibility="Collapsed">
-            <Border Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="10" Padding="24" HorizontalAlignment="Left" VerticalAlignment="Top" Width="700">
+            <Border Background="{DynamicResource PanelBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="10" Padding="24" HorizontalAlignment="Left" VerticalAlignment="Top" Width="700">
               <StackPanel>
                 <TextBlock x:Name="InfoTitle" Text="Hakkında" FontSize="17" FontWeight="SemiBold"/>
-                <TextBlock x:Name="InfoBody" TextWrapping="Wrap" Foreground="{StaticResource MutedBrush}" Margin="0,12,0,0"/>
+                <TextBlock x:Name="InfoBody" TextWrapping="Wrap" Foreground="{DynamicResource MutedBrush}" Margin="0,12,0,0"/>
               </StackPanel>
             </Border>
           </Grid>
@@ -262,7 +262,7 @@
       </Grid>
     </Grid>
 
-    <Border Grid.Row="2" Background="#0D131A" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,1,0,0" Padding="14,0">
+    <Border Grid.Row="2" Background="#0D131A" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0" Padding="14,0">
       <DockPanel VerticalAlignment="Center">
         <TextBlock Text="HATTRICK SSH  •  LOCAL FIRST" Foreground="#778797" FontSize="9" VerticalAlignment="Center"/>
         <TextBlock x:Name="FooterRight" Text="● Güvenli terminal çalışma alanı" Foreground="#3BD993" FontSize="9" DockPanel.Dock="Right" VerticalAlignment="Center"/>
