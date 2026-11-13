@@ -604,13 +604,13 @@ public partial class MainWindow : Window
         save.Click += (_, _) =>
         {
             if (string.IsNullOrWhiteSpace(name.Text) || string.IsNullOrWhiteSpace(command.Text) ||
-                command.Text.Contains('\\0'))
+                command.Text.Contains('\0'))
             {
                 MessageBox.Show("Düğme adı ve geçerli bir komut zorunludur.", "Komut eksik", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
             item.Name = name.Text.Trim();
-            item.Command = command.Text.TrimEnd('\\r','\\n');
+            item.Command = command.Text.TrimEnd('\r','\n');
             if (isNew) settings.Snippets.Add(item);
             store.SaveSettings(settings);
             SnippetList.Items.Refresh();
