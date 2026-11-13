@@ -66,7 +66,14 @@ public partial class MainWindow : Window
             TerminalWeb.CoreWebView2.SetVirtualHostNameToFolderMapping(
                 "hssh.local", Path.Combine(AppContext.BaseDirectory, "wwwroot"),
                 CoreWebView2HostResourceAccessKind.Allow);
+            var navigation = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            TerminalWeb.CoreWebView2.NavigationCompleted += (_, args) =>
+            {
+                if (args.IsSuccess) navigation.TrySetResult(true);
+                else navigation.TrySetException(new InvalidOperationException($"Terminal web bileşeni yüklenemedi: {args.WebErrorStatus}"));
+            };
             TerminalWeb.CoreWebView2.Navigate("https://hssh.local/index.html");
+            await navigation.Task.WaitAsync(TimeSpan.FromSeconds(30));
             terminalReady = true;
             await ApplyTerminalSettingsAsync();
             await TerminalWeb.ExecuteScriptAsync($"window.hsshSetScrollback({settings.TerminalScrollback});");
@@ -724,7 +731,7 @@ public partial class MainWindow : Window
 
         var dialog = new Window
         {
-            Title = "Yerel port yönlendirme ekle", Owner = this, Width = 480, Height = 440,
+            Title = "SSH tüneli ekle", Owner = this, Width = 480, Height = 440,
             WindowStartupLocation = WindowStartupLocation.CenterOwner, ResizeMode = ResizeMode.NoResize,
             Background = (Brush)FindResource("PanelBrush"), Foreground = (Brush)FindResource("TextBrush")
         };
@@ -835,7 +842,7 @@ public partial class MainWindow : Window
                 activeTunnels.Remove(entry);
                 _ = WriteTerminalAsync($"\r\n[TUNNEL] {entry.Label} kapandı (çıkış kodu {code}).\r\n");
             }));
-            await WriteTerminalAsync($"\r\n[TUNNEL] {entry.Label}\r\n[TUNNEL] Yerel port yönlendirme süreci başlatıldı.\r\n");
+            await WriteTerminalAsync($"\r\n[TUNNEL] {entry.Label}\r\n[TUNNEL] SSH tünel süreci başlatıldı ({modeFlag}).\r\n");
         }
         catch (Exception ex)
         {
