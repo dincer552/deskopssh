@@ -17,7 +17,6 @@ public sealed class SshConfigWriter(LocalStore store)
             $"  HostName {profile.Host}",
             $"  User {profile.Username}",
             $"  Port {profile.Port}",
-            "  RequestTTY force",
             "  ServerAliveInterval 30",
             "  ServerAliveCountMax 3",
             "  ConnectTimeout 25",
