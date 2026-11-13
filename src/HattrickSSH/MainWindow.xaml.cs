@@ -3,6 +3,7 @@ using HattrickSSH.Services;
 using Microsoft.Web.WebView2.Core;
 using Microsoft.Win32;
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.Text;
 using System.Text.Json;
