@@ -1,0 +1,16 @@
+**/bin/
+**/obj/
+**/node_modules/
+.vs/
+.vscode/
+*.user
+*.suo
+*.sln.docstates
+publish/
+artifacts/
+*.pfx
+*.pem
+*.key
+*.ppk
+known_hosts
+appsettings.local.json
