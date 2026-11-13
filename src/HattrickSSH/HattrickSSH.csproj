@@ -6,7 +6,6 @@
     <UseWindowsForms>false</UseWindowsForms>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <ImplicitUsings>enable</ImplicitUsings>
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <AssemblyName>HattrickSSH</AssemblyName>
