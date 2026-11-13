@@ -22,6 +22,7 @@ public partial class MainWindow : Window
     private readonly SshConfigWriter sshConfig;
     private readonly UpdateService updater = new();
     private readonly ObservableCollection<ServerProfile> profiles;
+    private readonly ObservableCollection<TunnelRuntime> activeTunnels = new();
     private AppSettings settings;
     private PseudoConsoleSession? session;
     private string? temporaryKeyPath;
@@ -36,6 +37,7 @@ public partial class MainWindow : Window
         settings = store.LoadSettings();
         profiles = new ObservableCollection<ServerProfile>(store.LoadProfiles());
         ProfilesList.ItemsSource = profiles;
+        TunnelList.ItemsSource = activeTunnels;
         if (profiles.Count > 0) ProfilesList.SelectedIndex = 0;
         VersionLabel.Text = "v" + (typeof(MainWindow).Assembly.GetName().Version?.ToString(3) ?? "0.1.0");
         LoadSettingsIntoUi();
@@ -111,6 +113,7 @@ public partial class MainWindow : Window
         ServerWorkspace.Visibility = Visibility.Collapsed;
         SettingsWorkspace.Visibility = Visibility.Collapsed;
         UpdatesWorkspace.Visibility = Visibility.Collapsed;
+        TunnelsWorkspace.Visibility = Visibility.Collapsed;
         InfoWorkspace.Visibility = Visibility.Collapsed;
 
         switch (key)
@@ -144,7 +147,9 @@ public partial class MainWindow : Window
                 _ = ConnectSelectedAsync(sftp: true);
                 break;
             case "tunnels":
-                ShowInfo("Port Yönlendirme", "Yerel, uzak ve SOCKS port yönlendirme özellikleri sonraki aşamada eklenecek. Bu sürümde henüz port açılmaz.");
+                TunnelsWorkspace.Visibility = Visibility.Visible;
+                PageTitle.Text = "Port Yönlendirme";
+                PageSubtitle.Text = "SSH üzerinden güvenli yerel TCP tünelleri";
                 break;
             case "snippets":
                 ShowInfo("Komut Parçacıkları", "Terminal altındaki hazır komutlar hostname, whoami, df -h / ve free -h komutlarını gerçek uzak shell'e gönderir. Kişisel komut kütüphanesi sonraki aşamada kalıcı hale getirilecek.");
@@ -520,6 +525,122 @@ public partial class MainWindow : Window
     private void OpenReleases_Click(object sender, RoutedEventArgs e) =>
         Process.Start(new ProcessStartInfo("https://github.com/dincer552/deskopssh/releases") { UseShellExecute = true });
 
+
+    private async void AddTunnel_Click(object sender, RoutedEventArgs e)
+    {
+        var profile = SelectedProfile;
+        if (profile is null)
+        {
+            MessageBox.Show("Önce tünelin kurulacağı SSH sunucusunu seçin.", "Sunucu seçilmedi", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        var dialog = new Window
+        {
+            Title = "Yerel port yönlendirme ekle", Owner = this, Width = 480, Height = 440,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner, ResizeMode = ResizeMode.NoResize,
+            Background = (Brush)FindResource("PanelBrush"), Foreground = (Brush)FindResource("TextBrush")
+        };
+        var stack = new StackPanel { Margin = new Thickness(22) };
+        stack.Children.Add(new TextBlock { Text = "Yeni SSH tüneli", FontSize = 18, FontWeight = FontWeights.SemiBold, Margin = new Thickness(0,0,0,10) });
+        var local = AddEditorField(stack, "Bu bilgisayardaki yerel port", "8080");
+        var target = AddEditorField(stack, "Sunucu tarafındaki hedef adres", "127.0.0.1");
+        var remote = AddEditorField(stack, "Sunucu tarafındaki hedef port", "80");
+        stack.Children.Add(new TextBlock
+        {
+            Text = $"Bağlantı: {profile.Username}@{profile.Host}  •  localhost:{local.Text} → {target.Text}:{remote.Text}",
+            Foreground = (Brush)FindResource("MutedBrush"), FontSize = 10, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0,10,0,14)
+        });
+        var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
+        var cancel = new Button { Content = "Vazgeç", MinWidth = 86, Margin = new Thickness(0,0,8,0) };
+        var start = new Button { Content = "Tüneli başlat", MinWidth = 110, Background = (Brush)FindResource("GreenBrush"), Foreground = Brushes.Black };
+        buttons.Children.Add(cancel); buttons.Children.Add(start); stack.Children.Add(buttons);
+        cancel.Click += (_, _) => dialog.DialogResult = false;
+        start.Click += (_, _) =>
+        {
+            if (!int.TryParse(local.Text, out var localPort) || localPort is < 1 or > 65535 ||
+                !int.TryParse(remote.Text, out var remotePort) || remotePort is < 1 or > 65535 ||
+                !Regex.IsMatch(target.Text.Trim(), @"^[A-Za-z0-9:][A-Za-z0-9._:-]{0,252}$"))
+            {
+                MessageBox.Show("Portlar 1–65535 aralığında olmalı. Hedef adres geçerli bir host/IP olmalı.", "Tünel bilgisi geçersiz", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+            dialog.DialogResult = true;
+        };
+        dialog.Content = stack;
+        if (dialog.ShowDialog() != true) return;
+        await StartTunnelAsync(profile, int.Parse(local.Text), target.Text.Trim(), int.Parse(remote.Text));
+    }
+
+    private async Task StartTunnelAsync(ServerProfile profile, int localPort, string destinationHost, int destinationPort)
+    {
+        string? keyPath = null;
+        PseudoConsoleSession? tunnelSession = null;
+        try
+        {
+            if (!string.IsNullOrWhiteSpace(profile.PrivateKeyId))
+                keyPath = keyStore.CreateTemporaryKey(profile.PrivateKeyId);
+            string? cloudflaredPath = null;
+            if (profile.UseCloudflareAccess)
+                cloudflaredPath = await cloudflared.EnsureInstalledAsync();
+            var configPath = sshConfig.Write(profile, keyPath, cloudflaredPath);
+            var ssh = FindOpenSsh("ssh.exe");
+            var alias = "hssh-" + profile.Id;
+            var forward = $"127.0.0.1:{localPort}:{destinationHost}:{destinationPort}";
+            var args = $"-v -N -o ExitOnForwardFailure=yes -L {forward} -F {QuoteArgument(configPath)} {alias}";
+            tunnelSession = PseudoConsoleSession.Start(ssh, args, 100, 12);
+            var entry = new TunnelRuntime
+            {
+                Label = $"{profile.Name}  •  localhost:{localPort}",
+                Details = $"127.0.0.1:{localPort} → {destinationHost}:{destinationPort}  •  Başlatılıyor",
+                Session = tunnelSession,
+                TemporaryKeyPath = keyPath
+            };
+            activeTunnels.Add(entry);
+            var started = tunnelSession;
+            started.OutputReceived += bytes =>
+            {
+                var base64 = Convert.ToBase64String(bytes);
+                Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    if (TerminalWeb.CoreWebView2 is not null)
+                        TerminalWeb.CoreWebView2.PostWebMessageAsString(base64);
+                }));
+            };
+            started.Exited += code => Dispatcher.BeginInvoke(new Action(() =>
+            {
+                started.Dispose();
+                keyStore.DeleteTemporaryKey(entry.TemporaryKeyPath);
+                activeTunnels.Remove(entry);
+                _ = WriteTerminalAsync($"\r\n[TUNNEL] {entry.Label} kapandı (çıkış kodu {code}).\r\n");
+            }));
+            await WriteTerminalAsync($"\r\n[TUNNEL] {entry.Label}\r\n[TUNNEL] Yerel port yönlendirme süreci başlatıldı.\r\n");
+        }
+        catch (Exception ex)
+        {
+            tunnelSession?.Dispose();
+            keyStore.DeleteTemporaryKey(keyPath);
+            MessageBox.Show(ex.Message, "Port yönlendirme hatası", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    private void StopTunnel_Click(object sender, RoutedEventArgs e)
+    {
+        if (TunnelList.SelectedItem is not TunnelRuntime entry) return;
+        entry.Session.Dispose();
+        keyStore.DeleteTemporaryKey(entry.TemporaryKeyPath);
+        activeTunnels.Remove(entry);
+        _ = WriteTerminalAsync($"\r\n[TUNNEL] {entry.Label} kullanıcı tarafından durduruldu.\r\n");
+    }
+
+    private sealed class TunnelRuntime
+    {
+        public string Label { get; init; } = "";
+        public string Details { get; init; } = "";
+        public PseudoConsoleSession Session { get; init; } = null!;
+        public string? TemporaryKeyPath { get; init; }
+    }
+
     private void SaveProfiles() => store.SaveProfiles(profiles);
 
     private void Minimize_Click(object sender, RoutedEventArgs e) => WindowState = WindowState.Minimized;
@@ -531,5 +652,11 @@ public partial class MainWindow : Window
     {
         closing = true;
         DisconnectSession(showMessage: false);
+        foreach (var tunnel in activeTunnels.ToList())
+        {
+            tunnel.Session.Dispose();
+            keyStore.DeleteTemporaryKey(tunnel.TemporaryKeyPath);
+        }
+        activeTunnels.Clear();
     }
 }
