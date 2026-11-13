@@ -7,15 +7,15 @@
     <Color x:Key="Text">#E7EDF4</Color>
     <Color x:Key="Muted">#91A0AF</Color>
     <Color x:Key="Green">#25D68A</Color>
-    <SolidColorBrush x:Key="BgBrush" Color="{StaticResource Bg}"/>
-    <SolidColorBrush x:Key="PanelBrush" Color="{StaticResource Panel}"/>
-    <SolidColorBrush x:Key="Panel2Brush" Color="{StaticResource Panel2}"/>
-    <SolidColorBrush x:Key="BorderBrush" Color="{StaticResource Border}"/>
-    <SolidColorBrush x:Key="TextBrush" Color="{StaticResource Text}"/>
-    <SolidColorBrush x:Key="MutedBrush" Color="{StaticResource Muted}"/>
-    <SolidColorBrush x:Key="GreenBrush" Color="{StaticResource Green}"/>
+    <SolidColorBrush x:Key="BgBrush" Color="{DynamicResource Bg}"/>
+    <SolidColorBrush x:Key="PanelBrush" Color="{DynamicResource Panel}"/>
+    <SolidColorBrush x:Key="Panel2Brush" Color="{DynamicResource Panel2}"/>
+    <SolidColorBrush x:Key="BorderBrush" Color="{DynamicResource Border}"/>
+    <SolidColorBrush x:Key="TextBrush" Color="{DynamicResource Text}"/>
+    <SolidColorBrush x:Key="MutedBrush" Color="{DynamicResource Muted}"/>
+    <SolidColorBrush x:Key="GreenBrush" Color="{DynamicResource Green}"/>
     <Style TargetType="Button">
-      <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
+      <Setter Property="Foreground" Value="{DynamicResource TextBrush}"/>
       <Setter Property="Background" Value="#1B2732"/>
       <Setter Property="BorderBrush" Value="#314454"/>
       <Setter Property="BorderThickness" Value="1"/>
@@ -38,20 +38,20 @@
       </Setter>
     </Style>
     <Style TargetType="TextBox">
-      <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
+      <Setter Property="Foreground" Value="{DynamicResource TextBrush}"/>
       <Setter Property="Background" Value="#0B1117"/>
-      <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}"/>
+      <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
       <Setter Property="Padding" Value="10,8"/>
-      <Setter Property="CaretBrush" Value="{StaticResource GreenBrush}"/>
+      <Setter Property="CaretBrush" Value="{DynamicResource GreenBrush}"/>
     </Style>
     <Style TargetType="ComboBox">
-      <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
+      <Setter Property="Foreground" Value="{DynamicResource TextBrush}"/>
       <Setter Property="Background" Value="#17212B"/>
-      <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}"/>
+      <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
       <Setter Property="Padding" Value="8"/>
     </Style>
     <Style TargetType="CheckBox">
-      <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
+      <Setter Property="Foreground" Value="{DynamicResource TextBrush}"/>
       <Setter Property="Margin" Value="0,7"/>
     </Style>
   </Application.Resources>
