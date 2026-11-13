@@ -38,6 +38,8 @@ public partial class MainWindow : Window
         profiles = new ObservableCollection<ServerProfile>(store.LoadProfiles());
         ProfilesList.ItemsSource = profiles;
         TunnelList.ItemsSource = activeTunnels;
+        settings.Snippets ??= new List<CommandSnippet>();
+        RenderSnippetButtons();
         if (profiles.Count > 0) ProfilesList.SelectedIndex = 0;
         VersionLabel.Text = "v" + (typeof(MainWindow).Assembly.GetName().Version?.ToString(3) ?? "0.1.0");
         LoadSettingsIntoUi();
@@ -430,6 +432,64 @@ public partial class MainWindow : Window
         if (!terminalReady || TerminalWeb.CoreWebView2 is null) return;
         try { await TerminalWeb.ExecuteScriptAsync("window.hsshWrite(" + JsonSerializer.Serialize(text) + ");"); }
         catch { }
+    }
+
+
+    private void RenderSnippetButtons()
+    {
+        SnippetPanel.Children.Clear();
+        foreach (var snippet in settings.Snippets.Take(10))
+        {
+            var button = new Button
+            {
+                Content = snippet.Name,
+                Tag = snippet.Command,
+                Padding = new Thickness(7, 3, 7, 3),
+                FontSize = 10,
+                Margin = new Thickness(2, 0, 2, 0),
+                ToolTip = snippet.Command
+            };
+            button.Click += Snippet_Click;
+            SnippetPanel.Children.Add(button);
+        }
+    }
+
+    private void AddSnippet_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new Window
+        {
+            Title = "Komut parçacığı ekle", Owner = this, Width = 480, Height = 340,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner, ResizeMode = ResizeMode.NoResize,
+            Background = (Brush)FindResource("PanelBrush"), Foreground = (Brush)FindResource("TextBrush")
+        };
+        var stack = new StackPanel { Margin = new Thickness(22) };
+        stack.Children.Add(new TextBlock { Text = "Hızlı komut", FontSize = 18, FontWeight = FontWeights.SemiBold, Margin = new Thickness(0,0,0,10) });
+        var name = AddEditorField(stack, "Düğme adı", "Yeni komut");
+        var command = AddEditorField(stack, "Uzak shell'e gönderilecek komut", "");
+        var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0,15,0,0) };
+        var cancel = new Button { Content = "Vazgeç", MinWidth = 86, Margin = new Thickness(0,0,8,0) };
+        var save = new Button { Content = "Kaydet", MinWidth = 96, Background = (Brush)FindResource("GreenBrush"), Foreground = Brushes.Black };
+        buttons.Children.Add(cancel); buttons.Children.Add(save); stack.Children.Add(buttons);
+        cancel.Click += (_, _) => dialog.DialogResult = false;
+        save.Click += (_, _) =>
+        {
+            if (string.IsNullOrWhiteSpace(name.Text) || string.IsNullOrWhiteSpace(command.Text))
+            {
+                MessageBox.Show("Düğme adı ve komut boş olamaz.", "Komut eksik", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+            if (settings.Snippets.Count >= 20)
+            {
+                MessageBox.Show("En fazla 20 komut parçacığı kaydedebilirsiniz.", "Sınır", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+            settings.Snippets.Add(new CommandSnippet { Name = name.Text.Trim(), Command = command.Text });
+            store.SaveSettings(settings);
+            RenderSnippetButtons();
+            dialog.DialogResult = true;
+        };
+        dialog.Content = stack;
+        dialog.ShowDialog();
     }
 
     private void Snippet_Click(object sender, RoutedEventArgs e)
