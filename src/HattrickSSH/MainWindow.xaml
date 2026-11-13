@@ -79,7 +79,15 @@
                   <TextBlock Text="BAĞLANTI PROFİLLERİ" FontWeight="Bold" FontSize="10" Foreground="{StaticResource MutedBrush}" VerticalAlignment="Center"/>
                   <Button Content="＋" Width="28" Padding="2" HorizontalAlignment="Right" Click="AddProfile_Click"/>
                 </Grid>
+                <TextBox x:Name="ProfileSearchBox" ToolTip="Profil adı, adres, kullanıcı veya grup ara" TextChanged="ProfileSearch_TextChanged" Margin="2,0,2,8" Height="34" VerticalContentAlignment="Center"/>
                 <ListBox x:Name="ProfilesList" SelectionChanged="ProfilesList_SelectionChanged" Background="Transparent" BorderThickness="0" Foreground="{StaticResource TextBrush}">
+                  <ListBox.GroupStyle>
+                    <GroupStyle>
+                      <GroupStyle.HeaderTemplate>
+                        <DataTemplate><TextBlock Text="{Binding Name}" Foreground="{StaticResource MutedBrush}" FontSize="10" FontWeight="Bold" Margin="4,9,0,3"/></DataTemplate>
+                      </GroupStyle.HeaderTemplate>
+                    </GroupStyle>
+                  </ListBox.GroupStyle>
                   <ListBox.ItemTemplate>
                     <DataTemplate>
                       <Border Background="#121D26" BorderBrush="#263947" BorderThickness="1" CornerRadius="8" Padding="10" Margin="0,2">
@@ -139,6 +147,13 @@
               <Border Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="10" Padding="18" Margin="0,0,0,12">
                 <StackPanel>
                   <TextBlock Text="Terminal" FontSize="14" FontWeight="SemiBold"/>
+                  <TextBlock Text="Tema" Foreground="{StaticResource MutedBrush}" Margin="0,12,0,4"/>
+                  <ComboBox x:Name="ThemeCombo" Width="220" HorizontalAlignment="Left">
+                    <ComboBoxItem Content="Codex Dark"/>
+                    <ComboBoxItem Content="Midnight Blue"/>
+                    <ComboBoxItem Content="Dracula"/>
+                    <ComboBoxItem Content="Classic Green"/>
+                  </ComboBox>
                   <TextBlock Text="Yazı boyutu" Foreground="{StaticResource MutedBrush}" Margin="0,12,0,4"/>
                   <StackPanel Orientation="Horizontal">
                     <TextBox x:Name="FontSizeBox" Width="90" Text="16"/>
