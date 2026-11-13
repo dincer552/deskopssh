@@ -32,6 +32,7 @@
   window.hsshWrite = text => term.write(text);
   window.hsshReset = () => term.reset();
   window.hsshSetFontSize = size => { term.options.fontSize = Math.max(10,Math.min(30,Number(size)||16)); fitAndResize(); };
+  window.hsshSetScrollback = rows => { term.options.scrollback = Math.max(500,Math.min(100000,Number(rows)||10000)); };
   window.hsshClear = () => term.clear();
   window.hsshFit = fitAndResize;
   const observer = new ResizeObserver(() => { clearTimeout(resizePending); resizePending=setTimeout(fitAndResize,80); });
