@@ -112,7 +112,7 @@ public sealed class PseudoConsoleSession : IDisposable
     public void Resize(short columns, short rows)
     {
         if (disposed || pseudoConsole == IntPtr.Zero) return;
-        var result = ResizePseudoConsole(pseudoConsole, new COORD((short)Math.Clamp(columns, 20, 400), (short)Math.Clamp(rows, 5, 200)));
+        var result = ResizePseudoConsole(pseudoConsole, new COORD((short)Math.Clamp((int)columns, 20, 400), (short)Math.Clamp((int)rows, 5, 200)));
         if (result != 0) Marshal.ThrowExceptionForHR(result);
     }
 
