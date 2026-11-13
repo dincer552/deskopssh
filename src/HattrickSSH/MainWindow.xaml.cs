@@ -6,6 +6,7 @@ using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -137,7 +138,10 @@ public partial class MainWindow : Window
                 ShowInfo("Hattrick SSH", "Windows için yerel-first SSH çalışma alanı. Gerçek SSH oturumları Windows OpenSSH ve ConPTY üzerinden yürür. Cloudflare Access kimlik doğrulamasını cloudflared yönetir. Özel anahtarlar DPAPI CurrentUser ile şifrelenir.");
                 break;
             case "sftp":
-                ShowInfo("SFTP Dosyaları", "SFTP dosya tarayıcısı yol haritasında. Bu görünüm ilk terminal sürümünde henüz etkin değil; dosya transferi hazırmış gibi gösterilmez.");
+                ServerWorkspace.Visibility = Visibility.Visible;
+                PageTitle.Text = "SFTP Dosyaları";
+                PageSubtitle.Text = "OpenSSH SFTP istemcisi • güvenli dosya aktarımı";
+                _ = ConnectSelectedAsync(sftp: true);
                 break;
             case "tunnels":
                 ShowInfo("Port Yönlendirme", "Yerel, uzak ve SOCKS port yönlendirme özellikleri sonraki aşamada eklenecek. Bu sürümde henüz port açılmaz.");
@@ -260,7 +264,9 @@ public partial class MainWindow : Window
         save.Click += (_, _) =>
         {
             if (string.IsNullOrWhiteSpace(name.Text) || string.IsNullOrWhiteSpace(host.Text) || string.IsNullOrWhiteSpace(user.Text) ||
-                !int.TryParse(port.Text, out var parsedPort) || parsedPort is < 1 or > 65535)
+                !int.TryParse(port.Text, out var parsedPort) || parsedPort is < 1 or > 65535 ||
+                !Regex.IsMatch(host.Text.Trim(), @"^[A-Za-z0-9:][A-Za-z0-9._:-]{0,252}$") ||
+                !Regex.IsMatch(user.Text.Trim(), @"^[A-Za-z0-9_][A-Za-z0-9._-]{0,63}$"))
             {
                 MessageBox.Show("Profil adı, host, kullanıcı ve 1–65535 arası port zorunludur.", "Eksik bilgi", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
@@ -288,7 +294,7 @@ public partial class MainWindow : Window
 
     private async void Connect_Click(object sender, RoutedEventArgs e) => await ConnectSelectedAsync();
 
-    private async Task ConnectSelectedAsync()
+    private async Task ConnectSelectedAsync(bool sftp = false)
     {
         var profile = SelectedProfile;
         if (profile is null)
@@ -305,13 +311,13 @@ public partial class MainWindow : Window
         DisconnectSession(showMessage: false);
         ConnectionStatus.Text = "● SSH istemcisi hazırlanıyor…";
         ConnectionDot.Fill = (Brush)FindResource("MutedBrush");
-        TerminalTitle.Text = profile.Name;
-        TransportLabel.Text = profile.UseCloudflareAccess ? "   CLOUDFLARE ACCESS • SSH" : "   DIRECT SSH";
+        TerminalTitle.Text = sftp ? "SFTP • " + profile.Name : profile.Name;
+        TransportLabel.Text = profile.UseCloudflareAccess ? "   CLOUDFLARE ACCESS • " + (sftp ? "SFTP" : "SSH") : "   DIRECT " + (sftp ? "SFTP" : "SSH");
         await WriteTerminalAsync($"\r\n\x1b[38;5;42m[HATTRICK SSH]\x1b[0m {profile.Host}:{profile.Port} bağlantısı başlatılıyor…\r\n");
 
         try
         {
-            var ssh = FindOpenSsh();
+            var ssh = FindOpenSsh(sftp ? "sftp.exe" : "ssh.exe");
             string? cloudflaredPath = null;
             if (profile.UseCloudflareAccess)
             {
@@ -326,7 +332,9 @@ public partial class MainWindow : Window
 
             var configPath = sshConfig.Write(profile, temporaryKeyPath, cloudflaredPath);
             var alias = "hssh-" + profile.Id;
-            var args = $"-tt -F {QuoteArgument(configPath)} {alias}";
+            var args = sftp
+                ? $"-F {QuoteArgument(configPath)} {alias}"
+                : $"-tt -F {QuoteArgument(configPath)} {alias}";
             session = PseudoConsoleSession.Start(ssh, args, 120, 34);
             var startedSession = session;
             startedSession.OutputReceived += bytes =>
@@ -352,10 +360,12 @@ public partial class MainWindow : Window
 
             ConnectionDot.Fill = (Brush)FindResource("GreenBrush");
             ConnectionStatus.Text = profile.UseCloudflareAccess
-                ? "● cloudflared + OpenSSH çalışıyor • Access/SSH çıktısı terminalde"
-                : "● OpenSSH çalışıyor • SSH el sıkışması bekleniyor";
+                ? "● cloudflared + OpenSSH " + (sftp ? "SFTP" : "SSH") + " çalışıyor • doğrulama terminalde"
+                : "● OpenSSH " + (sftp ? "SFTP" : "SSH") + " çalışıyor • el sıkışması bekleniyor";
             FooterRight.Text = "● Terminal süreci açık";
-            await WriteTerminalAsync("[PTY] Windows ConPTY oluşturuldu. SSH istemcisi gerçek interaktif shell açıyor.\r\n");
+            await WriteTerminalAsync(sftp
+                ? "[SFTP] Windows ConPTY üzerinden gerçek OpenSSH SFTP oturumu başlatıldı. ls, cd, get, put komutlarını kullanabilirsiniz.\r\n"
+                : "[PTY] Windows ConPTY oluşturuldu. SSH istemcisi gerçek interaktif shell açıyor.\r\n");
         }
         catch (Exception ex)
         {
@@ -368,22 +378,22 @@ public partial class MainWindow : Window
         }
     }
 
-    private static string FindOpenSsh()
+    private static string FindOpenSsh(string executableName = "ssh.exe")
     {
         var candidates = new[]
         {
-            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "OpenSSH", "ssh.exe"),
-            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), "System32", "OpenSSH", "ssh.exe")
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "OpenSSH", executableName),
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), "System32", "OpenSSH", executableName)
         };
         var found = candidates.FirstOrDefault(File.Exists);
         if (found is not null) return found;
         foreach (var directory in (Environment.GetEnvironmentVariable("PATH") ?? "").Split(Path.PathSeparator))
         {
             if (string.IsNullOrWhiteSpace(directory)) continue;
-            var file = Path.Combine(directory.Trim(), "ssh.exe");
+            var file = Path.Combine(directory.Trim(), executableName);
             if (File.Exists(file)) return file;
         }
-        throw new FileNotFoundException("Windows OpenSSH Client bulunamadı. Windows Ayarları → Sistem → İsteğe bağlı özellikler → Özellik ekle → OpenSSH Client kurun.");
+        throw new FileNotFoundException($"Windows OpenSSH Client bileşeni ({executableName}) bulunamadı. Windows Ayarları → Sistem → İsteğe bağlı özellikler → Özellik ekle → OpenSSH Client kurun.");
     }
 
     private static string QuoteArgument(string value) => "\"" + value.Replace("\\", "\\\\").Replace("\"", "\\\"") + "\"";
