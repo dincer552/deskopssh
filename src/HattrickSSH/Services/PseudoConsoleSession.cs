@@ -1,3 +1,4 @@
+using System.IO;
 using Microsoft.Win32.SafeHandles;
 using System.Diagnostics;
 using System.ComponentModel;
