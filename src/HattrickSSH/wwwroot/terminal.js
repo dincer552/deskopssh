@@ -15,6 +15,7 @@
   term.loadAddon(fit);
   term.open(document.getElementById('terminal'));
   const send = message => window.chrome?.webview?.postMessage(message);
+  const decoder = new TextDecoder('utf-8', {fatal:false});
   let resizePending = 0;
   const fitAndResize = () => {
     try { fit.fit(); send({type:'resize',cols:term.cols,rows:term.rows}); } catch {}
@@ -26,7 +27,7 @@
     if (typeof payload !== 'string') return;
     try {
       const bytes = Uint8Array.from(atob(payload), c => c.charCodeAt(0));
-      term.write(new TextDecoder('utf-8', {fatal:false}).decode(bytes, {stream:true}));
+      term.write(decoder.decode(bytes, {stream:true}));
     } catch {}
   });
   window.hsshWrite = text => term.write(text);
