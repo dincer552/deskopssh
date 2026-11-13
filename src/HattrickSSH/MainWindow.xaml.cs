@@ -230,7 +230,7 @@ public partial class MainWindow : Window
         string? keyId = profile.PrivateKeyId;
         chooseKey.Click += (_, _) =>
         {
-            var picker = new OpenFileDialog { Title = "SSH private key seç", Filter = "SSH key|*.pem;*.key;id_*;*.ppk|Tüm dosyalar|*.*", CheckFileExists = true };
+            var picker = new OpenFileDialog { Title = "SSH private key seç", Filter = "SSH private key|*.pem;*.key;id_*;*.openssh|Tüm dosyalar|*.*", CheckFileExists = true };
             if (picker.ShowDialog(this) != true) return;
             try
             {
