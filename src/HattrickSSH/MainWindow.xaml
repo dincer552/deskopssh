@@ -175,6 +175,34 @@
             </Border>
           </Grid>
 
+          <Grid x:Name="TunnelsWorkspace" Visibility="Collapsed">
+            <Border Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="10" Padding="20" HorizontalAlignment="Left" VerticalAlignment="Top" Width="720">
+              <DockPanel>
+                <StackPanel DockPanel.Dock="Top">
+                  <TextBlock Text="Yerel port yönlendirme" FontSize="16" FontWeight="SemiBold"/>
+                  <TextBlock Text="Bilgisayarındaki bir localhost portunu SSH sunucusu üzerinden hedef servise güvenli şekilde bağla." TextWrapping="Wrap" Foreground="{StaticResource MutedBrush}" Margin="0,8,0,14"/>
+                  <StackPanel Orientation="Horizontal" Margin="0,0,0,14">
+                    <Button Content="＋ Yönlendirme ekle" Click="AddTunnel_Click" Background="#1A302B" BorderBrush="#2D805E" Margin="0,0,8,0"/>
+                    <Button Content="Seçileni durdur" Click="StopTunnel_Click" Background="#382025" BorderBrush="#75414A"/>
+                  </StackPanel>
+                  <TextBlock Text="AKTİF TÜNELLER" FontSize="10" FontWeight="Bold" Foreground="{StaticResource MutedBrush}" Margin="0,0,0,7"/>
+                </StackPanel>
+                <ListBox x:Name="TunnelList" Background="Transparent" BorderThickness="0" Foreground="{StaticResource TextBrush}">
+                  <ListBox.ItemTemplate>
+                    <DataTemplate>
+                      <Border Background="#121D26" BorderBrush="#263947" BorderThickness="1" CornerRadius="8" Padding="11" Margin="0,2">
+                        <StackPanel>
+                          <TextBlock Text="{Binding Label}" FontWeight="SemiBold"/>
+                          <TextBlock Text="{Binding Details}" Foreground="{StaticResource MutedBrush}" FontSize="10" Margin="0,4,0,0"/>
+                        </StackPanel>
+                      </Border>
+                    </DataTemplate>
+                  </ListBox.ItemTemplate>
+                </ListBox>
+              </DockPanel>
+            </Border>
+          </Grid>
+
           <Grid x:Name="InfoWorkspace" Visibility="Collapsed">
             <Border Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="10" Padding="24" HorizontalAlignment="Left" VerticalAlignment="Top" Width="700">
               <StackPanel>
