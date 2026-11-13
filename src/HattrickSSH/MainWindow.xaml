@@ -250,6 +250,40 @@
             </Border>
           </Grid>
 
+          <Grid x:Name="SnippetsWorkspace" Visibility="Collapsed">
+            <Border Background="{DynamicResource PanelBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="10" Padding="16">
+              <DockPanel>
+                <StackPanel DockPanel.Dock="Top">
+                  <Grid Margin="2,0,2,12">
+                    <StackPanel>
+                      <TextBlock Text="KOMUT PARÇACIKLARI" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource MutedBrush}"/>
+                      <TextBlock Text="Sık kullandığın komutları kaydet, düzenle ve bağlı SSH terminaline gönder." FontSize="10" Foreground="{DynamicResource MutedBrush}" Margin="0,4,0,0"/>
+                    </StackPanel>
+                    <Button Content="＋ Yeni komut" HorizontalAlignment="Right" Click="AddSnippetWorkspace_Click"/>
+                  </Grid>
+                  <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                    <Button Content="Düzenle" Click="EditSnippetWorkspace_Click" Margin="0,0,6,0"/>
+                    <Button Content="Sil" Click="DeleteSnippetWorkspace_Click" Margin="0,0,6,0"/>
+                    <Button Content="Terminale gönder  ↗" Click="SendSnippetWorkspace_Click" Background="#1A302B" BorderBrush="#2D805E"/>
+                  </StackPanel>
+                </StackPanel>
+                <ListBox x:Name="SnippetList" Background="Transparent" BorderThickness="0" Foreground="{DynamicResource TextBrush}">
+                  <ListBox.ItemTemplate>
+                    <DataTemplate>
+                      <Border Background="{DynamicResource Panel2Brush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,2">
+                        <Grid>
+                          <Grid.ColumnDefinitions><ColumnDefinition Width="190"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                          <TextBlock Text="{Binding Name}" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                          <TextBlock Grid.Column="1" Text="{Binding Command}" FontFamily="Consolas" FontSize="11" Foreground="{DynamicResource GreenBrush}" TextWrapping="Wrap" VerticalAlignment="Center"/>
+                        </Grid>
+                      </Border>
+                    </DataTemplate>
+                  </ListBox.ItemTemplate>
+                </ListBox>
+              </DockPanel>
+            </Border>
+          </Grid>
+
           <Grid x:Name="InfoWorkspace" Visibility="Collapsed">
             <Border Background="{DynamicResource PanelBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="10" Padding="24" HorizontalAlignment="Left" VerticalAlignment="Top" Width="700">
               <StackPanel>
