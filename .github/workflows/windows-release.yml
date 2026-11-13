@@ -39,7 +39,7 @@ jobs:
           } elseif ("${{ inputs.publish_release }}" -eq "true") {
             $version = "${{ inputs.release_version }}"
           } else {
-            $version = "0.1.0"
+            $version = "0.1.${{ github.run_number }}"
           }
           if ($version -notmatch '^\d+\.\d+\.\d+(?:\.\d+)?$') { throw "Invalid version: $version" }
           "APP_VERSION=$version" >> $env:GITHUB_ENV
@@ -123,7 +123,7 @@ jobs:
           retention-days: 30
 
       - name: Publish GitHub Release
-        if: startsWith(github.ref, 'refs/tags/v') || inputs.publish_release == true
+        if: startsWith(github.ref, 'refs/tags/v') || inputs.publish_release == true || (github.ref == 'refs/heads/main' && github.event_name == 'push')
         env:
           GH_TOKEN: ${{ github.token }}
         shell: pwsh
