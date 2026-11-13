@@ -730,9 +730,35 @@ public partial class MainWindow : Window
         };
         var stack = new StackPanel { Margin = new Thickness(22) };
         stack.Children.Add(new TextBlock { Text = "Yeni SSH tüneli", FontSize = 18, FontWeight = FontWeights.SemiBold, Margin = new Thickness(0,0,0,10) });
-        var local = AddEditorField(stack, "Bu bilgisayardaki yerel port", "8080");
-        var target = AddEditorField(stack, "Sunucu tarafındaki hedef adres", "127.0.0.1");
-        var remote = AddEditorField(stack, "Sunucu tarafındaki hedef port", "80");
+        stack.Children.Add(new TextBlock { Text = "Tünel türü", Foreground = (Brush)FindResource("MutedBrush"), FontSize = 11, Margin = new Thickness(0,7,0,4) });
+        var mode = new ComboBox
+        {
+            ItemsSource = new[] { "Yerel yönlendirme (-L)", "Uzak yönlendirme (-R)", "SOCKS5 proxy (-D)" },
+            SelectedIndex = 0,
+            Width = 260,
+            HorizontalAlignment = HorizontalAlignment.Left
+        };
+        stack.Children.Add(mode);
+        var local = AddEditorField(stack, "Dinleme portu (local veya remote)", "8080");
+        var target = AddEditorField(stack, "Tünelin diğer ucundaki hedef adres", "127.0.0.1");
+        var remote = AddEditorField(stack, "Tünelin diğer ucundaki hedef port", "80");
+        var help = new TextBlock
+        {
+            Text = "SOCKS5 modunda yalnızca dinleme portu kullanılır. Uzak yönlendirme hedef adresi bu bilgisayardan erişilebilir olmalıdır.",
+            Foreground = (Brush)FindResource("MutedBrush"), FontSize = 10, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0,8,0,0)
+        };
+        stack.Children.Add(help);
+        mode.SelectionChanged += (_, _) =>
+        {
+            var dynamic = mode.SelectedIndex == 2;
+            target.IsEnabled = !dynamic;
+            remote.IsEnabled = !dynamic;
+            help.Text = dynamic
+                ? "SOCKS5 proxy bu bilgisayarda 127.0.0.1 üzerinde açılır. Uygulamaları bu adrese yönlendirerek proxy kullanabilirsiniz."
+                : mode.SelectedIndex == 1
+                    ? "Uzak port sunucuda 127.0.0.1 üzerinde dinler; hedef adres ve port bu Windows bilgisayarından erişilebilir olmalıdır."
+                    : "Yerel port bu bilgisayarda 127.0.0.1 üzerinde dinler; hedef adres ve port uzak SSH sunucusundan erişilebilir olmalıdır.";
+        };
         stack.Children.Add(new TextBlock
         {
             Text = $"Bağlantı: {profile.Username}@{profile.Host}  •  localhost:{local.Text} → {target.Text}:{remote.Text}",
@@ -745,21 +771,23 @@ public partial class MainWindow : Window
         cancel.Click += (_, _) => dialog.DialogResult = false;
         start.Click += (_, _) =>
         {
+            var dynamic = mode.SelectedIndex == 2;
             if (!int.TryParse(local.Text, out var localPort) || localPort is < 1 or > 65535 ||
-                !int.TryParse(remote.Text, out var remotePort) || remotePort is < 1 or > 65535 ||
-                !Regex.IsMatch(target.Text.Trim(), @"^[A-Za-z0-9:][A-Za-z0-9._:-]{0,252}$"))
+                (!dynamic && (!int.TryParse(remote.Text, out var remotePort) || remotePort is < 1 or > 65535 ||
+                !Regex.IsMatch(target.Text.Trim(), @"^[A-Za-z0-9:][A-Za-z0-9._:-]{0,252}$"))))
             {
-                MessageBox.Show("Portlar 1–65535 aralığında olmalı. Hedef adres geçerli bir host/IP olmalı.", "Tünel bilgisi geçersiz", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show("Dinleme ve hedef portları 1–65535 aralığında olmalı. Hedef adres geçerli bir host/IP olmalı.", "Tünel bilgisi geçersiz", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
             dialog.DialogResult = true;
         };
         dialog.Content = stack;
         if (dialog.ShowDialog() != true) return;
-        await StartTunnelAsync(profile, int.Parse(local.Text), target.Text.Trim(), int.Parse(remote.Text));
+        await StartTunnelAsync(profile, mode.SelectedIndex, int.Parse(local.Text), target.Text.Trim(),
+            int.TryParse(remote.Text, out var destinationPort) ? destinationPort : 0);
     }
 
-    private async Task StartTunnelAsync(ServerProfile profile, int localPort, string destinationHost, int destinationPort)
+    private async Task StartTunnelAsync(ServerProfile profile, int mode, int listenPort, string destinationHost, int destinationPort)
     {
         string? keyPath = null;
         PseudoConsoleSession? tunnelSession = null;
@@ -773,13 +801,19 @@ public partial class MainWindow : Window
             var configPath = sshConfig.Write(profile, keyPath, cloudflaredPath);
             var ssh = FindOpenSsh("ssh.exe");
             var alias = "hssh-" + profile.Id;
-            var forward = $"127.0.0.1:{localPort}:{destinationHost}:{destinationPort}";
-            var args = $"-v -N -o ExitOnForwardFailure=yes -L {forward} -F {QuoteArgument(configPath)} {alias}";
+            var modeFlag = mode switch { 1 => "-R", 2 => "-D", _ => "-L" };
+            var forward = mode == 2
+                ? $"127.0.0.1:{listenPort}"
+                : $"127.0.0.1:{listenPort}:{destinationHost}:{destinationPort}";
+            var args = $"-v -N -o ExitOnForwardFailure=yes {modeFlag} {forward} -F {QuoteArgument(configPath)} {alias}";
             tunnelSession = PseudoConsoleSession.Start(ssh, args, 100, 12);
+            var modeLabel = mode switch { 1 => "Uzak yönlendirme", 2 => "SOCKS5", _ => "Yerel yönlendirme" };
             var entry = new TunnelRuntime
             {
-                Label = $"{profile.Name}  •  localhost:{localPort}",
-                Details = $"127.0.0.1:{localPort} → {destinationHost}:{destinationPort}  •  Başlatılıyor",
+                Label = $"{profile.Name}  •  {modeLabel} • port {listenPort}",
+                Details = mode == 2
+                    ? $"SOCKS5 proxy: 127.0.0.1:{listenPort} • Başlatılıyor"
+                    : $"{modeFlag} 127.0.0.1:{listenPort}:{destinationHost}:{destinationPort} • Başlatılıyor",
                 Session = tunnelSession,
                 TemporaryKeyPath = keyPath
             };
