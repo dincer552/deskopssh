@@ -29,6 +29,9 @@ public sealed class UpdateService
         using var manifestResponse = await Http.GetAsync(manifestUrl, token);
         manifestResponse.EnsureSuccessStatusCode();
         using var manifest = await JsonDocument.ParseAsync(await manifestResponse.Content.ReadAsStreamAsync(token), cancellationToken: token);
+        var manifestVersion = manifest.RootElement.GetProperty("version").GetString() ?? "";
+        if (!string.Equals(manifestVersion, version, StringComparison.OrdinalIgnoreCase))
+            throw new InvalidDataException("Release sürümü ile güncelleme manifesti uyuşmuyor.");
         var hash = manifest.RootElement.GetProperty("installerSha256").GetString() ?? "";
         var notes = root.GetProperty("html_url").GetString() ?? "https://github.com/dincer552/deskopssh/releases";
         if (hash.Length != 64 || !hash.All(Uri.IsHexDigit)) throw new InvalidDataException("Release güncelleme manifesti geçersiz.");
