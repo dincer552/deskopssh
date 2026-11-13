@@ -38,6 +38,7 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         keyStore = new SecureKeyStore(store);
+        keyStore.CleanupStaleTemporaryKeys();
         sshConfig = new SshConfigWriter(store);
         settings = store.LoadSettings();
         profiles = new ObservableCollection<ServerProfile>(store.LoadProfiles());
