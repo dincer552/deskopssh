@@ -1,0 +1,6 @@
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#05080c;color:#e8edf2}
+#terminal{width:100%;height:100%;padding:8px 10px 7px;box-sizing:border-box}
+.xterm{height:100%;font-feature-settings:"liga" 0}
+.xterm-viewport{overflow-y:auto!important}
+.xterm .xterm-viewport::-webkit-scrollbar{width:9px}
+.xterm .xterm-viewport::-webkit-scrollbar-thumb{background:#293746;border-radius:8px}
