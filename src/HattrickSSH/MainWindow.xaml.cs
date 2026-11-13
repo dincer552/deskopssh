@@ -49,6 +49,7 @@ public partial class MainWindow : Window
         connectionHistory = new ObservableCollection<ConnectionHistoryEntry>(store.LoadHistory().OrderByDescending(x => x.StartedAtUtc));
         HistoryList.ItemsSource = connectionHistory;
         settings.Snippets ??= new List<CommandSnippet>();
+        SnippetList.ItemsSource = settings.Snippets;
         RenderSnippetButtons();
         if (profiles.Count > 0) ProfilesList.SelectedIndex = 0;
         VersionLabel.Text = "v" + (typeof(MainWindow).Assembly.GetName().Version?.ToString(3) ?? "0.1.0");
@@ -149,6 +150,7 @@ public partial class MainWindow : Window
         UpdatesWorkspace.Visibility = Visibility.Collapsed;
         TunnelsWorkspace.Visibility = Visibility.Collapsed;
         HistoryWorkspace.Visibility = Visibility.Collapsed;
+        SnippetsWorkspace.Visibility = Visibility.Collapsed;
         InfoWorkspace.Visibility = Visibility.Collapsed;
 
         switch (key)
@@ -187,7 +189,10 @@ public partial class MainWindow : Window
                 PageSubtitle.Text = "SSH üzerinden güvenli yerel TCP tünelleri";
                 break;
             case "snippets":
-                ShowInfo("Komut Parçacıkları", "Terminal altındaki hazır komutlar hostname, whoami, df -h / ve free -h komutlarını gerçek uzak shell'e gönderir. Kişisel komut kütüphanesi sonraki aşamada kalıcı hale getirilecek.");
+                SnippetsWorkspace.Visibility = Visibility.Visible;
+                PageTitle.Text = "Komut Parçacıkları";
+                PageSubtitle.Text = "Kişisel komut kütüphanen • yerel ayarlarda saklanır";
+                SnippetList.Items.Refresh();
                 break;
             case "history":
                 HistoryWorkspace.Visibility = Visibility.Visible;
@@ -529,18 +534,67 @@ public partial class MainWindow : Window
         }
     }
 
-    private void AddSnippet_Click(object sender, RoutedEventArgs e)
+    private void AddSnippet_Click(object sender, RoutedEventArgs e) => ShowSnippetEditor(null);
+
+    private void AddSnippetWorkspace_Click(object sender, RoutedEventArgs e) => ShowSnippetEditor(null);
+
+    private void EditSnippetWorkspace_Click(object sender, RoutedEventArgs e)
     {
+        if (SnippetList.SelectedItem is not CommandSnippet selected) return;
+        ShowSnippetEditor(selected);
+    }
+
+    private void DeleteSnippetWorkspace_Click(object sender, RoutedEventArgs e)
+    {
+        if (SnippetList.SelectedItem is not CommandSnippet selected) return;
+        if (MessageBox.Show($"'{selected.Name}' komut parçacığı silinsin mi?", "Komutu sil",
+            MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
+        settings.Snippets.Remove(selected);
+        store.SaveSettings(settings);
+        SnippetList.Items.Refresh();
+        RenderSnippetButtons();
+    }
+
+    private void SendSnippetWorkspace_Click(object sender, RoutedEventArgs e)
+    {
+        if (SnippetList.SelectedItem is not CommandSnippet selected) return;
+        if (session is null)
+        {
+            MessageBox.Show("Önce SSH veya SFTP oturumu açın.", "Bağlantı yok", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+        session.WriteInput(selected.Command + "\\r");
+        ServerWorkspace.Visibility = Visibility.Visible;
+        SettingsWorkspace.Visibility = Visibility.Collapsed;
+        UpdatesWorkspace.Visibility = Visibility.Collapsed;
+        TunnelsWorkspace.Visibility = Visibility.Collapsed;
+        HistoryWorkspace.Visibility = Visibility.Collapsed;
+        SnippetsWorkspace.Visibility = Visibility.Collapsed;
+        InfoWorkspace.Visibility = Visibility.Collapsed;
+        PageTitle.Text = "Terminal";
+    }
+
+    private void ShowSnippetEditor(CommandSnippet? snippet)
+    {
+        var isNew = snippet is null;
+        var item = snippet ?? new CommandSnippet();
+        if (isNew && settings.Snippets.Count >= 20)
+        {
+            MessageBox.Show("En fazla 20 komut parçacığı kaydedebilirsiniz.", "Sınır", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
         var dialog = new Window
         {
-            Title = "Komut parçacığı ekle", Owner = this, Width = 480, Height = 340,
+            Title = isNew ? "Komut parçacığı ekle" : "Komut parçacığını düzenle",
+            Owner = this, Width = 500, Height = 370,
             WindowStartupLocation = WindowStartupLocation.CenterOwner, ResizeMode = ResizeMode.NoResize,
             Background = (Brush)FindResource("PanelBrush"), Foreground = (Brush)FindResource("TextBrush")
         };
         var stack = new StackPanel { Margin = new Thickness(22) };
-        stack.Children.Add(new TextBlock { Text = "Hızlı komut", FontSize = 18, FontWeight = FontWeights.SemiBold, Margin = new Thickness(0,0,0,10) });
-        var name = AddEditorField(stack, "Düğme adı", "Yeni komut");
-        var command = AddEditorField(stack, "Uzak shell'e gönderilecek komut", "");
+        stack.Children.Add(new TextBlock { Text = isNew ? "Yeni hızlı komut" : "Komutu düzenle", FontSize = 18, FontWeight = FontWeights.SemiBold, Margin = new Thickness(0,0,0,10) });
+        var name = AddEditorField(stack, "Düğme adı", item.Name);
+        var command = AddEditorField(stack, "Uzak shell'e gönderilecek komut", item.Command);
         var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0,15,0,0) };
         var cancel = new Button { Content = "Vazgeç", MinWidth = 86, Margin = new Thickness(0,0,8,0) };
         var save = new Button { Content = "Kaydet", MinWidth = 96, Background = (Brush)FindResource("GreenBrush"), Foreground = Brushes.Black };
@@ -548,18 +602,17 @@ public partial class MainWindow : Window
         cancel.Click += (_, _) => dialog.DialogResult = false;
         save.Click += (_, _) =>
         {
-            if (string.IsNullOrWhiteSpace(name.Text) || string.IsNullOrWhiteSpace(command.Text))
+            if (string.IsNullOrWhiteSpace(name.Text) || string.IsNullOrWhiteSpace(command.Text) ||
+                command.Text.Contains('\\0'))
             {
-                MessageBox.Show("Düğme adı ve komut boş olamaz.", "Komut eksik", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show("Düğme adı ve geçerli bir komut zorunludur.", "Komut eksik", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
-            if (settings.Snippets.Count >= 20)
-            {
-                MessageBox.Show("En fazla 20 komut parçacığı kaydedebilirsiniz.", "Sınır", MessageBoxButton.OK, MessageBoxImage.Information);
-                return;
-            }
-            settings.Snippets.Add(new CommandSnippet { Name = name.Text.Trim(), Command = command.Text });
+            item.Name = name.Text.Trim();
+            item.Command = command.Text.TrimEnd('\\r','\\n');
+            if (isNew) settings.Snippets.Add(item);
             store.SaveSettings(settings);
+            SnippetList.Items.Refresh();
             RenderSnippetButtons();
             dialog.DialogResult = true;
         };
