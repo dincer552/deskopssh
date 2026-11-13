@@ -36,6 +36,20 @@ public sealed class CloudflaredInstaller
             await using var output = new FileStream(tempPath, FileMode.Create, FileAccess.Write, FileShare.None);
             await input.CopyToAsync(output, cancellationToken);
         }
+        if (asset.TryGetProperty("digest", out var digestElement))
+        {
+            var digest = digestElement.GetString() ?? "";
+            if (digest.StartsWith("sha256:", StringComparison.OrdinalIgnoreCase))
+            {
+                await using var downloaded = File.OpenRead(tempPath);
+                var actual = Convert.ToHexString(await System.Security.Cryptography.SHA256.HashDataAsync(downloaded, cancellationToken));
+                if (!actual.Equals(digest["sha256:".Length..], StringComparison.OrdinalIgnoreCase))
+                {
+                    File.Delete(tempPath);
+                    throw new InvalidDataException("cloudflared SHA-256 doğrulaması başarısız.");
+                }
+            }
+        }
         if (new FileInfo(tempPath).Length < 1_000_000)
         {
             File.Delete(tempPath);
