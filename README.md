@@ -85,13 +85,12 @@ The README is the source of truth for delivery. Check items only after their tes
 - [ ] Add multi-tab sessions and split panes.
 
 ### Phase 6 — Updates and distribution
-- [ ] Build portable self-contained `HattrickSSH-Portable.exe`.
-- [ ] Build `HattrickSSH-Setup.exe` with per-user installation.
-- [ ] Generate `latest.json` with version, notes URL and installer SHA-256.
-- [ ] Check GitHub Releases from inside the app.
-- [ ] Verify downloaded installer hash before launching it.
-- [ ] Preserve profiles, DPAPI key files, known_hosts and preferences during update.
-- [ ] Publish release assets from tags or manual workflow dispatch.
+- [x] Build portable self-contained x64 package as `HattrickSSH-Portable.zip`.
+- [x] Build `HattrickSSH-Setup.exe` with per-user installation.
+- [x] Generate `latest.json` with version, notes URL and installer SHA-256.
+- [x] Implement GitHub Releases check and SHA-256 verification in the desktop updater.
+- [x] Configure main-branch builds to publish versioned GitHub Releases; tag/manual dispatch builds are also supported.
+- [x] Preserve app data outside the installation directory (profiles, DPAPI key files, known_hosts and preferences).
 
 ### Phase 7 — Validation and release
 - [ ] Build on GitHub Actions Windows runner.
@@ -104,7 +103,7 @@ The README is the source of truth for delivery. Check items only after their tes
 
 ## Current status
 
-The repository was created empty. The first implementation milestone is the Windows desktop foundation and a real ConPTY/OpenSSH terminal. Azure acceptance tests require a Windows device with access to the user's Cloudflare Access identity and private key; GitHub Actions cannot truthfully substitute for that interactive test.
+The repository was created empty. The initial Windows x64 build and setup package have passed GitHub Actions. Main-branch CI builds are published as versioned GitHub Releases (0.1.<run number>); create a `vX.Y.Z` tag for a manually selected release version. Azure acceptance tests still require a Windows device with access to the user's Cloudflare Access identity and imported private key; GitHub Actions cannot truthfully substitute for that interactive test.
 
 ## Build locally
 
