@@ -107,7 +107,7 @@ The README is the source of truth for delivery. Check items only after their tes
 
 ## Current status
 
-The repository was created empty. The baseline Windows x64 setup and portable packages are published in GitHub Releases (latest published baseline at the time of this update: v0.1.37). Main-branch CI generates a new version `0.1.<run number>` and uploads the installer, portable ZIP and SHA-256 manifest. Later source changes still need their own successful CI build and Windows desktop smoke test before they should be treated as validated. Azure acceptance tests require a Windows device with access to the user's Cloudflare Access identity and locally imported private key; GitHub Actions cannot substitute for that interactive test.
+The repository was created empty. The baseline Windows x64 setup and portable packages are published in GitHub Releases (latest published baseline at the time of this update: v0.1.46). Main-branch CI generates a new version `0.1.<run number>` and uploads the installer, portable ZIP and SHA-256 manifest. The current main branch also includes a dedicated snippet manager and stale temporary-key cleanup; its own CI build is queued separately. Later source changes still need a successful CI build and Windows desktop smoke test before they should be treated as validated. Azure acceptance tests require a Windows device with access to the user's Cloudflare Access identity and locally imported private key; GitHub Actions cannot substitute for that interactive test.
 
 ## Build locally
 
