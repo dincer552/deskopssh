@@ -22,9 +22,11 @@ public partial class MainWindow : Window
     private readonly UpdateService updater = new();
     private readonly ObservableCollection<ServerProfile> profiles;
     private readonly ObservableCollection<TunnelRuntime> activeTunnels = new();
+    private readonly ObservableCollection<ConnectionHistoryEntry> connectionHistory;
     private AppSettings settings;
     private PseudoConsoleSession? session;
     private string? temporaryKeyPath;
+    private ConnectionHistoryEntry? activeHistoryEntry;
     private bool terminalReady;
     private bool closing;
 
@@ -37,6 +39,8 @@ public partial class MainWindow : Window
         profiles = new ObservableCollection<ServerProfile>(store.LoadProfiles());
         ProfilesList.ItemsSource = profiles;
         TunnelList.ItemsSource = activeTunnels;
+        connectionHistory = new ObservableCollection<ConnectionHistoryEntry>(store.LoadHistory().OrderByDescending(x => x.StartedAtUtc));
+        HistoryList.ItemsSource = connectionHistory;
         settings.Snippets ??= new List<CommandSnippet>();
         RenderSnippetButtons();
         if (profiles.Count > 0) ProfilesList.SelectedIndex = 0;
@@ -115,6 +119,7 @@ public partial class MainWindow : Window
         SettingsWorkspace.Visibility = Visibility.Collapsed;
         UpdatesWorkspace.Visibility = Visibility.Collapsed;
         TunnelsWorkspace.Visibility = Visibility.Collapsed;
+        HistoryWorkspace.Visibility = Visibility.Collapsed;
         InfoWorkspace.Visibility = Visibility.Collapsed;
 
         switch (key)
@@ -156,7 +161,10 @@ public partial class MainWindow : Window
                 ShowInfo("Komut Parçacıkları", "Terminal altındaki hazır komutlar hostname, whoami, df -h / ve free -h komutlarını gerçek uzak shell'e gönderir. Kişisel komut kütüphanesi sonraki aşamada kalıcı hale getirilecek.");
                 break;
             case "history":
-                ShowInfo("Geçmiş", "Güvenlik nedeniyle ilk sürümde terminal girişleri veya komutlar diske kaydedilmez. Bağlantı geçmişi ve isteğe bağlı, gizli bilgileri filtrelenmiş çıktı kaydı sonraki aşamadadır.");
+                HistoryWorkspace.Visibility = Visibility.Visible;
+                PageTitle.Text = "Bağlantı Geçmişi";
+                PageSubtitle.Text = "Yerel kaydedilen oturum meta verileri • terminal içeriği kaydedilmez";
+                HistoryList.Items.Refresh();
                 break;
         }
     }
@@ -314,7 +322,17 @@ public partial class MainWindow : Window
             return;
         }
 
-        DisconnectSession(showMessage: false);
+        DisconnectSession(showMessage: false, reason: "Yeni bağlantı başlatıldı");
+        activeHistoryEntry = new ConnectionHistoryEntry
+        {
+            ProfileName = profile.Name,
+            Host = profile.Host,
+            Username = profile.Username,
+            Transport = profile.UseCloudflareAccess ? (sftp ? "Cloudflare SFTP" : "Cloudflare SSH") : (sftp ? "SFTP" : "SSH"),
+            Status = "Bağlantı hazırlanıyor"
+        };
+        connectionHistory.Insert(0, activeHistoryEntry);
+        SaveHistory();
         ConnectionStatus.Text = "● SSH istemcisi hazırlanıyor…";
         ConnectionDot.Fill = (Brush)FindResource("MutedBrush");
         TerminalTitle.Text = sftp ? "SFTP • " + profile.Name : profile.Name;
@@ -343,6 +361,7 @@ public partial class MainWindow : Window
                 : $"-tt -F {QuoteArgument(configPath)} {alias}";
             session = PseudoConsoleSession.Start(ssh, args, 120, 34);
             var startedSession = session;
+            var historyEntry = activeHistoryEntry;
             startedSession.OutputReceived += bytes =>
             {
                 var base64 = Convert.ToBase64String(bytes);
@@ -362,12 +381,16 @@ public partial class MainWindow : Window
                 keyStore.DeleteTemporaryKey(temporaryKeyPath);
                 temporaryKeyPath = null;
                 session = null;
+                if (activeHistoryEntry?.Id == historyEntry.Id)
+                    CompleteActiveHistory(code == 0 ? "Normal çıkış" : $"SSH çıkış kodu {code}");
             }));
 
             ConnectionDot.Fill = (Brush)FindResource("GreenBrush");
             ConnectionStatus.Text = profile.UseCloudflareAccess
                 ? "● cloudflared + OpenSSH " + (sftp ? "SFTP" : "SSH") + " çalışıyor • doğrulama terminalde"
                 : "● OpenSSH " + (sftp ? "SFTP" : "SSH") + " çalışıyor • el sıkışması bekleniyor";
+            if (activeHistoryEntry is not null) activeHistoryEntry.Status = "SSH süreci başlatıldı";
+            SaveHistory();
             FooterRight.Text = "● Terminal süreci açık";
             await WriteTerminalAsync(sftp
                 ? "[SFTP] Windows ConPTY üzerinden gerçek OpenSSH SFTP oturumu başlatıldı. ls, cd, get, put komutlarını kullanabilirsiniz.\r\n"
@@ -375,7 +398,8 @@ public partial class MainWindow : Window
         }
         catch (Exception ex)
         {
-            DisconnectSession(showMessage: false);
+            CompleteActiveHistory("Başlatılamadı");
+            DisconnectSession(showMessage: false, reason: "Bağlantı hatası");
             ConnectionDot.Fill = Brushes.IndianRed;
             ConnectionStatus.Text = "● Bağlantı başlatılamadı";
             FooterRight.Text = "Bağlantı hatası";
@@ -404,15 +428,16 @@ public partial class MainWindow : Window
 
     private static string QuoteArgument(string value) => "\"" + value.Replace("\\", "\\\\").Replace("\"", "\\\"") + "\"";
 
-    private void Disconnect_Click(object sender, RoutedEventArgs e) => DisconnectSession(showMessage: true);
+    private void Disconnect_Click(object sender, RoutedEventArgs e) => DisconnectSession(showMessage: true, reason: "Kullanıcı bağlantıyı kesti");
     private async void Reconnect_Click(object sender, RoutedEventArgs e)
     {
-        DisconnectSession(showMessage: false);
+        DisconnectSession(showMessage: false, reason: "Yeniden bağlanılıyor");
         await ConnectSelectedAsync();
     }
 
-    private void DisconnectSession(bool showMessage)
+    private void DisconnectSession(bool showMessage, string reason = "Oturum kapatıldı")
     {
+        CompleteActiveHistory(reason);
         try { session?.Dispose(); } catch { }
         session = null;
         keyStore.DeleteTemporaryKey(temporaryKeyPath);
@@ -700,6 +725,31 @@ public partial class MainWindow : Window
         public string? TemporaryKeyPath { get; init; }
     }
 
+    private void CompleteActiveHistory(string status)
+    {
+        if (activeHistoryEntry is null) return;
+        activeHistoryEntry.EndedAtUtc = DateTime.UtcNow;
+        activeHistoryEntry.Status = status;
+        activeHistoryEntry = null;
+        SaveHistory();
+    }
+
+    private void SaveHistory()
+    {
+        store.SaveHistory(connectionHistory);
+        HistoryList.Items.Refresh();
+    }
+
+    private void ClearHistory_Click(object sender, RoutedEventArgs e)
+    {
+        if (connectionHistory.Count == 0) return;
+        if (MessageBox.Show("Tüm yerel bağlantı geçmişi silinsin mi?", "Geçmişi temizle",
+            MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
+        connectionHistory.Clear();
+        activeHistoryEntry = null;
+        SaveHistory();
+    }
+
     private void SaveProfiles() => store.SaveProfiles(profiles);
 
     private void Minimize_Click(object sender, RoutedEventArgs e) => WindowState = WindowState.Minimized;
@@ -710,7 +760,7 @@ public partial class MainWindow : Window
     private void Window_Closing(object? sender, System.ComponentModel.CancelEventArgs e)
     {
         closing = true;
-        DisconnectSession(showMessage: false);
+        DisconnectSession(showMessage: false, reason: "Uygulama kapatıldı");
         foreach (var tunnel in activeTunnels.ToList())
         {
             tunnel.Session.Dispose();
