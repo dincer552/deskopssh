@@ -1,0 +1,61 @@
+using System.Text.Json;
+using HattrickSSH.Models;
+
+namespace HattrickSSH.Services;
+
+public sealed class LocalStore
+{
+    private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
+    public string RootPath { get; } = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "HattrickSSH");
+    public string KnownHostsPath => Path.Combine(RootPath, "known_hosts");
+    public string KeyDirectory => Path.Combine(RootPath, "keys");
+
+    private string ProfilesPath => Path.Combine(RootPath, "servers.json");
+    private string SettingsPath => Path.Combine(RootPath, "settings.json");
+
+    public LocalStore()
+    {
+        Directory.CreateDirectory(RootPath);
+        Directory.CreateDirectory(KeyDirectory);
+        if (!File.Exists(KnownHostsPath)) File.WriteAllText(KnownHostsPath, "");
+    }
+
+    public List<ServerProfile> LoadProfiles()
+    {
+        try
+        {
+            if (File.Exists(ProfilesPath))
+                return JsonSerializer.Deserialize<List<ServerProfile>>(File.ReadAllText(ProfilesPath), JsonOptions) ?? [];
+        }
+        catch { /* Keep a broken settings file from preventing application startup. */ }
+        return
+        [
+            new ServerProfile
+            {
+                Name = "Azure • hattrick-vm",
+                Host = "ssh.dinceryuksek.com",
+                Port = 22,
+                Username = "azureuser",
+                UseCloudflareAccess = true
+            }
+        ];
+    }
+
+    public void SaveProfiles(IEnumerable<ServerProfile> profiles) =>
+        File.WriteAllText(ProfilesPath, JsonSerializer.Serialize(profiles, JsonOptions));
+
+    public AppSettings LoadSettings()
+    {
+        try
+        {
+            if (File.Exists(SettingsPath))
+                return JsonSerializer.Deserialize<AppSettings>(File.ReadAllText(SettingsPath), JsonOptions) ?? new();
+        }
+        catch { }
+        return new AppSettings();
+    }
+
+    public void SaveSettings(AppSettings settings) =>
+        File.WriteAllText(SettingsPath, JsonSerializer.Serialize(settings, JsonOptions));
+}
