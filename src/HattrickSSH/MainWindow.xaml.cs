@@ -9,6 +9,7 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Data;
 using System.Windows.Media;
 
 namespace HattrickSSH;
@@ -21,6 +22,7 @@ public partial class MainWindow : Window
     private readonly SshConfigWriter sshConfig;
     private readonly UpdateService updater = new();
     private readonly ObservableCollection<ServerProfile> profiles;
+    private readonly ICollectionView profilesView;
     private readonly ObservableCollection<TunnelRuntime> activeTunnels = new();
     private readonly ObservableCollection<ConnectionHistoryEntry> connectionHistory;
     private AppSettings settings;
@@ -38,7 +40,10 @@ public partial class MainWindow : Window
         sshConfig = new SshConfigWriter(store);
         settings = store.LoadSettings();
         profiles = new ObservableCollection<ServerProfile>(store.LoadProfiles());
-        ProfilesList.ItemsSource = profiles;
+        profilesView = CollectionViewSource.GetDefaultView(profiles);
+        profilesView.Filter = FilterProfile;
+        profilesView.GroupDescriptions.Add(new PropertyGroupDescription(nameof(ServerProfile.Group)));
+        ProfilesList.ItemsSource = profilesView;
         TunnelList.ItemsSource = activeTunnels;
         connectionHistory = new ObservableCollection<ConnectionHistoryEntry>(store.LoadHistory().OrderByDescending(x => x.StartedAtUtc));
         HistoryList.ItemsSource = connectionHistory;
@@ -47,6 +52,7 @@ public partial class MainWindow : Window
         if (profiles.Count > 0) ProfilesList.SelectedIndex = 0;
         VersionLabel.Text = "v" + (typeof(MainWindow).Assembly.GetName().Version?.ToString(3) ?? "0.1.0");
         LoadSettingsIntoUi();
+        ApplyTheme();
     }
 
     private async void Window_Loaded(object sender, RoutedEventArgs e)
@@ -103,6 +109,20 @@ public partial class MainWindow : Window
     }
 
     private ServerProfile? SelectedProfile => ProfilesList.SelectedItem as ServerProfile;
+
+    private bool FilterProfile(object item)
+    {
+        if (item is not ServerProfile profile) return false;
+        var query = ProfileSearchBox?.Text?.Trim();
+        if (string.IsNullOrWhiteSpace(query)) return true;
+        return profile.Name.Contains(query, StringComparison.OrdinalIgnoreCase) ||
+               profile.Host.Contains(query, StringComparison.OrdinalIgnoreCase) ||
+               profile.Username.Contains(query, StringComparison.OrdinalIgnoreCase) ||
+               profile.Group.Contains(query, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private void ProfileSearch_TextChanged(object sender, TextChangedEventArgs e) =>
+        profilesView.Refresh();
 
     private void ProfilesList_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
@@ -567,8 +587,63 @@ public partial class MainWindow : Window
 
     private async Task ApplyTerminalSettingsAsync()
     {
-        if (terminalReady)
-            await TerminalWeb.ExecuteScriptAsync($"window.hsshSetFontSize({settings.TerminalFontSize});");
+        if (!terminalReady) return;
+        await TerminalWeb.ExecuteScriptAsync($"window.hsshSetFontSize({settings.TerminalFontSize});");
+        var themeJson = JsonSerializer.Serialize(GetTerminalTheme());
+        await TerminalWeb.ExecuteScriptAsync($"window.hsshSetTheme({themeJson});");
+    }
+
+    private void ApplyTheme()
+    {
+        (string Bg, string Panel, string Panel2, string Border, string Text, string Muted, string Green) palette =
+            settings.Theme switch
+            {
+                "Midnight Blue" => ("#08111F", "#0D1B2D", "#132640", "#24415F", "#E8F2FF", "#92A9C5", "#49D9EE"),
+                "Dracula" => ("#17151F", "#211F2B", "#2B2938", "#45405B", "#F4F0FF", "#B8AFCB", "#A5E075"),
+                "Classic Green" => ("#050B08", "#0A1510", "#102117", "#274331", "#D7FBE3", "#88AD95", "#53EF87"),
+                _ => ("#0B0F14", "#111820", "#17212B", "#263441", "#E7EDF4", "#91A0AF", "#25D68A")
+            };
+
+        SetThemeBrush("BgBrush", palette.Bg);
+        SetThemeBrush("PanelBrush", palette.Panel);
+        SetThemeBrush("Panel2Brush", palette.Panel2);
+        SetThemeBrush("BorderBrush", palette.Border);
+        SetThemeBrush("TextBrush", palette.Text);
+        SetThemeBrush("MutedBrush", palette.Muted);
+        SetThemeBrush("GreenBrush", palette.Green);
+        if (terminalReady) _ = ApplyTerminalSettingsAsync();
+    }
+
+    private static void SetThemeBrush(string resourceKey, string hex)
+    {
+        var color = (Color)ColorConverter.ConvertFromString(hex)!;
+        Application.Current.Resources[resourceKey] = new SolidColorBrush(color);
+    }
+
+    private Dictionary<string, string> GetTerminalTheme()
+    {
+        var palette = settings.Theme switch
+        {
+            "Midnight Blue" => ("Background", "#08111F", "#E8F2FF", "#49D9EE", "#92A9C5"),
+            "Dracula" => ("Background", "#17151F", "#F4F0FF", "#A5E075", "#B8AFCB"),
+            "Classic Green" => ("Background", "#050B08", "#D7FBE3", "#53EF87", "#88AD95"),
+            _ => ("Background", "#05080C", "#E7EDF4", "#25D68A", "#91A0AF")
+        };
+        var bg = palette.Item2;
+        var fg = palette.Item3;
+        var green = palette.Item4;
+        var muted = palette.Item5;
+        return new Dictionary<string, string>
+        {
+            ["background"] = bg, ["foreground"] = fg, ["cursor"] = fg,
+            ["selectionBackground"] = "#294B40",
+            ["black"] = "#080B10", ["red"] = "#F07178", ["green"] = green,
+            ["yellow"] = "#E5C07B", ["blue"] = "#61A7EE", ["magenta"] = "#C678DD",
+            ["cyan"] = "#56B6C2", ["white"] = fg,
+            ["brightBlack"] = muted, ["brightRed"] = "#FF8790", ["brightGreen"] = green,
+            ["brightYellow"] = "#F5D98D", ["brightBlue"] = "#8DBAFF",
+            ["brightMagenta"] = "#D8AAFF", ["brightCyan"] = "#89EEEE", ["brightWhite"] = "#FFFFFF"
+        };
     }
 
     private void LoadSettingsIntoUi()
@@ -577,6 +652,9 @@ public partial class MainWindow : Window
         ScrollbackBox.Text = settings.TerminalScrollback.ToString();
         AutoReconnectCheck.IsChecked = settings.AutoReconnect;
         AutoUpdateCheck.IsChecked = settings.CheckUpdatesOnStartup;
+        ThemeCombo.SelectedItem = ThemeCombo.Items.OfType<ComboBoxItem>()
+            .FirstOrDefault(item => string.Equals(item.Content?.ToString(), settings.Theme, StringComparison.OrdinalIgnoreCase))
+            ?? ThemeCombo.Items[0];
     }
 
     private void SaveSettings_Click(object sender, RoutedEventArgs e)
@@ -591,7 +669,9 @@ public partial class MainWindow : Window
         settings.TerminalScrollback = scroll;
         settings.AutoReconnect = AutoReconnectCheck.IsChecked == true;
         settings.CheckUpdatesOnStartup = AutoUpdateCheck.IsChecked == true;
+        settings.Theme = (ThemeCombo.SelectedItem as ComboBoxItem)?.Content?.ToString() ?? "Codex Dark";
         store.SaveSettings(settings);
+        ApplyTheme();
         _ = ApplyTerminalSettingsAsync();
         if (terminalReady) _ = TerminalWeb.ExecuteScriptAsync($"window.hsshSetScrollback({settings.TerminalScrollback});");
         MessageBox.Show("Tercihler kaydedildi.", "Hattrick SSH", MessageBoxButton.OK, MessageBoxImage.Information);
