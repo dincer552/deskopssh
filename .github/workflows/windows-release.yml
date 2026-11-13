@@ -1,0 +1,140 @@
+name: Hattrick SSH Windows Build
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      publish_release:
+        description: "Build and publish a GitHub Release"
+        required: true
+        type: boolean
+        default: false
+      release_version:
+        description: "Release version without leading v (example: 0.1.0)"
+        required: true
+        type: string
+        default: "0.1.0"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: windows-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select application version
+        shell: pwsh
+        run: |
+          if (" ${{ github.ref }}".Trim().StartsWith("refs/tags/v")) {
+            $version = "${{ github.ref_name }}".Substring(1)
+          } elseif ("${{ inputs.publish_release }}" -eq "true") {
+            $version = "${{ inputs.release_version }}"
+          } else {
+            $version = "0.1.0"
+          }
+          if ($version -notmatch '^\d+\.\d+\.\d+(?:\.\d+)?$') { throw "Invalid version: $version" }
+          "APP_VERSION=$version" >> $env:GITHUB_ENV
+          Write-Host "Building version $version"
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: src/HattrickSSH/package.json
+
+      - name: Install terminal assets
+        working-directory: src/HattrickSSH
+        shell: pwsh
+        run: |
+          npm install --no-audit --no-fund
+          New-Item -ItemType Directory -Force wwwroot/lib | Out-Null
+          Copy-Item node_modules/@xterm/xterm/lib/xterm.js wwwroot/lib/xterm.js
+          Copy-Item node_modules/@xterm/xterm/css/xterm.css wwwroot/lib/xterm.css
+          Copy-Item node_modules/@xterm/addon-fit/lib/addon-fit.js wwwroot/lib/addon-fit.js
+
+      - name: Generate transparent Windows app icon
+        shell: pwsh
+        run: ./scripts/generate-icon.ps1
+
+      - name: Restore
+        run: dotnet restore src/HattrickSSH/HattrickSSH.csproj
+
+      - name: Build
+        run: dotnet build src/HattrickSSH/HattrickSSH.csproj -c Release --no-restore -p:Version=${{ env.APP_VERSION }}
+
+      - name: Publish self-contained x64 application
+        run: dotnet publish src/HattrickSSH/HattrickSSH.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:Version=${{ env.APP_VERSION }} -o artifacts/publish
+
+      - name: Create portable package
+        shell: pwsh
+        run: |
+          Copy-Item artifacts/publish/HattrickSSH.exe artifacts/HattrickSSH-Portable.exe
+          Compress-Archive -Path artifacts/publish/* -DestinationPath artifacts/HattrickSSH-Portable.zip -Force
+
+      - name: Install Inno Setup
+        run: choco install innosetup --yes --no-progress
+
+      - name: Build setup EXE
+        shell: pwsh
+        run: |
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (!(Test-Path $iscc)) { $iscc = "$env:ProgramFiles\Inno Setup 6\ISCC.exe" }
+          if (!(Test-Path $iscc)) { throw "Inno Setup compiler was not found." }
+          & $iscc "/DAppVersion=$env:APP_VERSION" "/DPublishDir=$((Resolve-Path artifacts/publish).Path)" installer/HattrickSSH.iss
+          if ($LASTEXITCODE -ne 0) { throw "Inno Setup failed with exit code $LASTEXITCODE" }
+          Move-Item installer/HattrickSSH-Setup.exe artifacts/HattrickSSH-Setup.exe -Force
+
+      - name: Create update manifest
+        shell: pwsh
+        run: |
+          $hash = (Get-FileHash artifacts/HattrickSSH-Setup.exe -Algorithm SHA256).Hash.ToLowerInvariant()
+          $manifest = [ordered]@{
+            version = $env:APP_VERSION
+            installerSha256 = $hash
+            installer = "HattrickSSH-Setup.exe"
+            notes = "https://github.com/dincer552/deskopssh/releases"
+          }
+          $manifest | ConvertTo-Json -Depth 4 | Set-Content artifacts/latest.json -Encoding utf8
+          Get-ChildItem artifacts
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: HattrickSSH-Windows-${{ env.APP_VERSION }}
+          path: |
+            artifacts/HattrickSSH-Setup.exe
+            artifacts/HattrickSSH-Portable.exe
+            artifacts/HattrickSSH-Portable.zip
+            artifacts/latest.json
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Publish GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v') || inputs.publish_release == true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: pwsh
+        run: |
+          $tag = "v$env:APP_VERSION"
+          $assets = @("artifacts/HattrickSSH-Setup.exe","artifacts/HattrickSSH-Portable.zip","artifacts/latest.json")
+          gh release view $tag --repo $env:GITHUB_REPOSITORY *> $null
+          if ($LASTEXITCODE -eq 0) {
+            gh release upload $tag $assets --repo $env:GITHUB_REPOSITORY --clobber
+          } else {
+            gh release create $tag $assets --repo $env:GITHUB_REPOSITORY --title "Hattrick SSH $env:APP_VERSION" --notes "Windows x64 release. Setup EXE and portable ZIP. The updater verifies the installer SHA-256 before launch." --latest
+          }
