@@ -29,6 +29,7 @@ public partial class MainWindow : Window
     private ConnectionHistoryEntry? activeHistoryEntry;
     private bool terminalReady;
     private bool closing;
+    private int reconnectAttempts;
 
     public MainWindow()
     {
@@ -308,7 +309,7 @@ public partial class MainWindow : Window
 
     private async void Connect_Click(object sender, RoutedEventArgs e) => await ConnectSelectedAsync();
 
-    private async Task ConnectSelectedAsync(bool sftp = false)
+    private async Task ConnectSelectedAsync(bool sftp = false, bool automatic = false)
     {
         var profile = SelectedProfile;
         if (profile is null)
@@ -323,7 +324,8 @@ public partial class MainWindow : Window
         }
 
         DisconnectSession(showMessage: false, reason: "Yeni bağlantı başlatıldı");
-        activeHistoryEntry = new ConnectionHistoryEntry
+        if (!automatic) reconnectAttempts = 0;
+        var newHistoryEntry = new ConnectionHistoryEntry
         {
             ProfileName = profile.Name,
             Host = profile.Host,
@@ -331,7 +333,8 @@ public partial class MainWindow : Window
             Transport = profile.UseCloudflareAccess ? (sftp ? "Cloudflare SFTP" : "Cloudflare SSH") : (sftp ? "SFTP" : "SSH"),
             Status = "Bağlantı hazırlanıyor"
         };
-        connectionHistory.Insert(0, activeHistoryEntry);
+        activeHistoryEntry = newHistoryEntry;
+        connectionHistory.Insert(0, newHistoryEntry);
         SaveHistory();
         ConnectionStatus.Text = "● SSH istemcisi hazırlanıyor…";
         ConnectionDot.Fill = (Brush)FindResource("MutedBrush");
@@ -361,7 +364,7 @@ public partial class MainWindow : Window
                 : $"-tt -F {QuoteArgument(configPath)} {alias}";
             session = PseudoConsoleSession.Start(ssh, args, 120, 34);
             var startedSession = session;
-            var historyEntry = activeHistoryEntry;
+            var historyEntry = activeHistoryEntry!;
             startedSession.OutputReceived += bytes =>
             {
                 var base64 = Convert.ToBase64String(bytes);
@@ -383,6 +386,26 @@ public partial class MainWindow : Window
                 session = null;
                 if (activeHistoryEntry?.Id == historyEntry.Id)
                     CompleteActiveHistory(code == 0 ? "Normal çıkış" : $"SSH çıkış kodu {code}");
+
+                if (code != 0 && settings.AutoReconnect && reconnectAttempts < 3 && !closing)
+                {
+                    reconnectAttempts++;
+                    var attemptNumber = reconnectAttempts;
+                    ConnectionStatus.Text = $"● Bağlantı koptu • {attemptNumber}/3 yeniden deneme hazırlanıyor";
+                    _ = Task.Run(async () =>
+                    {
+                        await Task.Delay(TimeSpan.FromSeconds(Math.Min(2 * attemptNumber, 6)));
+                        Dispatcher.BeginInvoke(new Action(() =>
+                        {
+                            if (!closing && session is null && SelectedProfile?.Id == profile.Id)
+                                _ = ConnectSelectedAsync(sftp, automatic: true);
+                        }));
+                    });
+                }
+                else if (code == 0)
+                {
+                    reconnectAttempts = 0;
+                }
             }));
 
             ConnectionDot.Fill = (Brush)FindResource("GreenBrush");
