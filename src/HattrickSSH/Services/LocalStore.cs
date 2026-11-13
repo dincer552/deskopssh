@@ -13,6 +13,7 @@ public sealed class LocalStore
 
     private string ProfilesPath => Path.Combine(RootPath, "servers.json");
     private string SettingsPath => Path.Combine(RootPath, "settings.json");
+    private string HistoryPath => Path.Combine(RootPath, "connection-history.json");
 
     public LocalStore()
     {
@@ -58,4 +59,18 @@ public sealed class LocalStore
 
     public void SaveSettings(AppSettings settings) =>
         File.WriteAllText(SettingsPath, JsonSerializer.Serialize(settings, JsonOptions));
+
+    public List<ConnectionHistoryEntry> LoadHistory()
+    {
+        try
+        {
+            if (File.Exists(HistoryPath))
+                return JsonSerializer.Deserialize<List<ConnectionHistoryEntry>>(File.ReadAllText(HistoryPath), JsonOptions) ?? [];
+        }
+        catch { }
+        return [];
+    }
+
+    public void SaveHistory(IEnumerable<ConnectionHistoryEntry> history) =>
+        File.WriteAllText(HistoryPath, JsonSerializer.Serialize(history.Take(100), JsonOptions));
 }
