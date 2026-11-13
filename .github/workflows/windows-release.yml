@@ -22,7 +22,7 @@ permissions:
 
 concurrency:
   group: windows-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   build:
@@ -83,7 +83,6 @@ jobs:
       - name: Create portable package
         shell: pwsh
         run: |
-          Copy-Item artifacts/publish/HattrickSSH.exe artifacts/HattrickSSH-Portable.exe
           Compress-Archive -Path artifacts/publish/* -DestinationPath artifacts/HattrickSSH-Portable.zip -Force
 
       - name: Install Inno Setup
@@ -118,7 +117,6 @@ jobs:
           name: HattrickSSH-Windows-${{ env.APP_VERSION }}
           path: |
             artifacts/HattrickSSH-Setup.exe
-            artifacts/HattrickSSH-Portable.exe
             artifacts/HattrickSSH-Portable.zip
             artifacts/latest.json
           if-no-files-found: error
