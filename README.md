@@ -96,7 +96,8 @@ The README is the source of truth for delivery. Check items only after their tes
 - [x] Preserve app data outside the installation directory (profiles, DPAPI key files, known_hosts and preferences).
 
 ### Phase 7 — Validation and release
-- [x] Build and package on GitHub Actions Windows runner (baseline v0.1.37).
+- [x] Build and package on GitHub Actions Windows runner (published baseline v0.1.55).
+- [ ] Pass the new automated LocalStore persistence and SSH configuration security test suite in Windows CI.
 - [x] Bundle WebView2 terminal assets in the Windows package.
 - [ ] Smoke-test application startup on a real Windows desktop.
 - [ ] Test direct SSH and Cloudflare Access separately.
@@ -107,7 +108,7 @@ The README is the source of truth for delivery. Check items only after their tes
 
 ## Current status
 
-The repository was created empty. The baseline Windows x64 setup and portable packages are published in GitHub Releases (latest published baseline at the time of this update: v0.1.46). Main-branch CI generates a new version `0.1.<run number>` and uploads the installer, portable ZIP and SHA-256 manifest. The current main branch also includes a dedicated snippet manager and stale temporary-key cleanup; its own CI build is queued separately. Later source changes still need a successful CI build and Windows desktop smoke test before they should be treated as validated. Azure acceptance tests require a Windows device with access to the user's Cloudflare Access identity and locally imported private key; GitHub Actions cannot substitute for that interactive test.
+The repository was created empty. The latest published Windows x64 baseline is v0.1.55; it includes the self-contained setup EXE, portable ZIP and SHA-256 update manifest. Main-branch CI generates a new version `0.1.<run number>` for each push. The current main revision also includes automated tests for local profile/settings/history persistence and SSH configuration validation, plus a stricter profile-ID check before creating SSH config files. Those latest changes are not part of v0.1.55; the CI run for the current main revision must pass before a newer release is considered validated. Azure acceptance tests still require a Windows device with the user's Cloudflare Access identity and locally imported private key; GitHub Actions cannot substitute for that interactive test.
 
 ## Build locally
 
