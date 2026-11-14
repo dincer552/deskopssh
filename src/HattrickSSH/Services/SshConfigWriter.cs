@@ -8,10 +8,11 @@ public sealed class SshConfigWriter(LocalStore store)
 {
     public string Write(ServerProfile profile, string? identityPath, string? cloudflaredPath)
     {
-        if (!Regex.IsMatch(profile.Host, @"^[A-Za-z0-9:][A-Za-z0-9._:-]{0,252}$") ||
+        if (!Guid.TryParseExact(profile.Id, "N", out _) ||
+            !Regex.IsMatch(profile.Host, @"^[A-Za-z0-9:][A-Za-z0-9._:-]{0,252}$") ||
             !Regex.IsMatch(profile.Username, @"^[A-Za-z0-9_][A-Za-z0-9._-]{0,63}$") ||
             profile.Port is < 1 or > 65535)
-            throw new InvalidDataException("SSH host, kullanıcı adı veya port bilgisi geçersiz.");
+            throw new InvalidDataException("Profil kimliği, SSH host, kullanıcı adı veya port bilgisi geçersiz.");
         var dir = Path.Combine(store.RootPath, "ssh");
         Directory.CreateDirectory(dir);
         var configPath = Path.Combine(dir, profile.Id + ".conf");
