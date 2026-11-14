@@ -57,9 +57,17 @@ public sealed class PseudoConsoleSession : IDisposable
             inputRead.Dispose();
             outputWrite.Dispose();
 
-            InitializeProcThreadAttributeList(IntPtr.Zero, 1, 0, out var attributeSize);
+            // The size parameter is IN/OUT: the second call must receive the
+            // allocation size returned by the initial size-query call.
+            var attributeSize = IntPtr.Zero;
+            if (InitializeProcThreadAttributeList(IntPtr.Zero, 1, 0, ref attributeSize))
+                throw new InvalidOperationException("ConPTY process attribute size query unexpectedly succeeded.");
+            var sizeQueryError = Marshal.GetLastWin32Error();
+            if (sizeQueryError != 122 || attributeSize == IntPtr.Zero)
+                throw new Win32Exception(sizeQueryError, "ConPTY process attribute buffer size could not be determined.");
+
             attributeList = Marshal.AllocHGlobal(attributeSize);
-            if (!InitializeProcThreadAttributeList(attributeList, 1, 0, out _))
+            if (!InitializeProcThreadAttributeList(attributeList, 1, 0, ref attributeSize))
                 throw new Win32Exception(Marshal.GetLastWin32Error());
             if (!UpdateProcThreadAttribute(attributeList, 0, (IntPtr)0x00020016, hpc, (IntPtr)IntPtr.Size, IntPtr.Zero, IntPtr.Zero))
                 throw new Win32Exception(Marshal.GetLastWin32Error());
@@ -193,7 +201,7 @@ public sealed class PseudoConsoleSession : IDisposable
     [DllImport("kernel32.dll", SetLastError = true)] private static extern int CreatePseudoConsole(COORD size, SafeFileHandle input, SafeFileHandle output, uint flags, out IntPtr console);
     [DllImport("kernel32.dll", SetLastError = true)] private static extern int ResizePseudoConsole(IntPtr console, COORD size);
     [DllImport("kernel32.dll")] private static extern void ClosePseudoConsole(IntPtr console);
-    [DllImport("kernel32.dll", SetLastError = true)] private static extern bool InitializeProcThreadAttributeList(IntPtr list, int count, int flags, out IntPtr size);
+    [DllImport("kernel32.dll", SetLastError = true)] private static extern bool InitializeProcThreadAttributeList(IntPtr list, int count, int flags, ref IntPtr size);
     [DllImport("kernel32.dll", SetLastError = true)] private static extern bool UpdateProcThreadAttribute(IntPtr list, uint flags, IntPtr attribute, IntPtr value, IntPtr size, IntPtr previous, IntPtr returnSize);
     [DllImport("kernel32.dll")] private static extern void DeleteProcThreadAttributeList(IntPtr list);
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)] private static extern bool CreateProcess(string? applicationName, StringBuilder commandLine, IntPtr processAttributes, IntPtr threadAttributes, bool inheritHandles, uint flags, IntPtr environment, string? currentDirectory, ref STARTUPINFOEX startupInfo, out PROCESS_INFORMATION processInformation);
