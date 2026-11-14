@@ -80,7 +80,16 @@ public sealed class PseudoConsoleSession : IDisposable
 
             var startup = new STARTUPINFOEX
             {
-                StartupInfo = new STARTUPINFO { cb = Marshal.SizeOf<STARTUPINFOEX>() },
+                StartupInfo = new STARTUPINFO
+                {
+                    cb = Marshal.SizeOf<STARTUPINFOEX>(),
+                    // Prevent the child from inheriting the test host / parent console
+                    // standard handles. ConPTY supplies the child's terminal handles.
+                    dwFlags = 0x00000100, // STARTF_USESTDHANDLES
+                    hStdInput = new IntPtr(-1),  // INVALID_HANDLE_VALUE
+                    hStdOutput = new IntPtr(-1),
+                    hStdError = new IntPtr(-1)
+                },
                 lpAttributeList = attributeList
             };
             var command = new StringBuilder(Quote(executable) + " " + arguments);
