@@ -77,6 +77,9 @@ jobs:
       - name: Build
         run: dotnet build src/HattrickSSH/HattrickSSH.csproj -c Release --no-restore -p:Version=${{ env.APP_VERSION }}
 
+      - name: Run persistence tests
+        run: dotnet test tests/HattrickSSH.Persistence.Tests/HattrickSSH.Persistence.Tests.csproj -c Release --logger "console;verbosity=normal"
+
       - name: Publish self-contained x64 application
         run: dotnet publish src/HattrickSSH/HattrickSSH.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:Version=${{ env.APP_VERSION }} -o artifacts/publish
 
