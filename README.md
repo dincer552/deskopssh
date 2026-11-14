@@ -46,7 +46,7 @@ The README is the source of truth for delivery. Check items only after their tes
 - [x] Define architecture, release format, and acceptance criteria.
 - [x] Add MIT license and third-party dependency notices.
 - [x] Add README-driven implementation roadmap and acceptance plan.
-- [ ] Add contribution guidance for external contributors.
+- [x] Add contribution guidance for external contributors (CONTRIBUTING.md).
 
 ### Phase 1 — Desktop foundation
 - [x] Create .NET 8 WPF solution and Codex-inspired shell.
