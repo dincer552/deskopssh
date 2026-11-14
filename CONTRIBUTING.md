@@ -22,9 +22,10 @@ cd ../..
 ./scripts/generate-icon.ps1
 dotnet restore src/HattrickSSH/HattrickSSH.csproj
 dotnet build src/HattrickSSH/HattrickSSH.csproj -c Release
+dotnet test tests/HattrickSSH.Persistence.Tests/HattrickSSH.Persistence.Tests.csproj -c Release
 ```
 
-Never add a real private key, Access token or personal server credential to a test fixture. Use a disposable SSH test host for transport tests.
+Never add a real private key, Access token or personal server credential to a test fixture. Use a disposable SSH test host for transport tests. The GitHub Actions Windows workflow runs the persistence and SSH configuration tests before packaging.
 
 ## Pull requests
 
