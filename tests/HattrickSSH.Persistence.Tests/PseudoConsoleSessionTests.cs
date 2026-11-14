@@ -7,7 +7,7 @@ namespace HattrickSSH.Persistence.Tests;
 public sealed class PseudoConsoleSessionTests
 {
     [Fact]
-    public async Task StartMonitoring_delivers_early_output_and_exit_events()
+    public async Task StartMonitoring_delivers_interactive_output_and_exit_events()
     {
         var commandProcessor = Path.Combine(Environment.SystemDirectory, "cmd.exe");
         var output = new StringBuilder();
@@ -15,8 +15,11 @@ public sealed class PseudoConsoleSessionTests
         var outputReceived = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
         var processExited = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
 
+        // Keep cmd.exe interactive so the test verifies the complete terminal
+        // path (PTY input -> shell -> PTY output), not just a process that exits
+        // before the output reader has been started.
         using var session = PseudoConsoleSession.Start(
-            commandProcessor, "/d /c echo HATTRICK_SSH_CONPTY_PROBE", columns: 80, rows: 25);
+            commandProcessor, "/d /q", columns: 80, rows: 25);
 
         session.OutputReceived += bytes =>
         {
@@ -34,9 +37,10 @@ public sealed class PseudoConsoleSessionTests
 
         session.StartMonitoring();
         session.StartMonitoring(); // Starting readers twice must not duplicate event delivery.
+        session.WriteInput("echo HATTRICK_SSH_CONPTY_PROBE\r\nexit\r\n");
 
-        await outputReceived.Task.WaitAsync(TimeSpan.FromSeconds(10));
-        var exitCode = await processExited.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        await outputReceived.Task.WaitAsync(TimeSpan.FromSeconds(15));
+        var exitCode = await processExited.Task.WaitAsync(TimeSpan.FromSeconds(15));
 
         string captured;
         lock (outputLock) captured = output.ToString();
