@@ -84,8 +84,11 @@ public sealed class PseudoConsoleSession : IDisposable
                 lpAttributeList = attributeList
             };
             var command = new StringBuilder(Quote(executable) + " " + arguments);
-            if (!CreateProcess(executable, command, IntPtr.Zero, IntPtr.Zero, false,
-                0x00080000 | 0x00000400, IntPtr.Zero, Path.GetDirectoryName(executable),
+            // Let Windows resolve argv[0] from the quoted command line, as in
+            // Microsoft's ConPTY sample. The extended startup attribute attaches
+            // the child to the pseudoconsole.
+            if (!CreateProcess(null, command, IntPtr.Zero, IntPtr.Zero, false,
+                0x00080000, IntPtr.Zero, Path.GetDirectoryName(executable),
                 ref startup, out var info))
                 throw new Win32Exception(Marshal.GetLastWin32Error());
 
