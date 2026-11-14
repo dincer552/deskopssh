@@ -54,6 +54,21 @@ public sealed class SshConfigWriterTests : IDisposable
         Assert.Contains("C:/Program Files/cloudflared/cloudflared.exe", config);
     }
 
+    [Fact]
+    public void Write_rejectsUnsafeProfileId()
+    {
+        var store = CreateStore();
+        var profile = new ServerProfile
+        {
+            Id = "../outside",
+            Host = "ssh.example.internal",
+            Username = "tester",
+            Port = 22
+        };
+
+        Assert.Throws<InvalidDataException>(() => new SshConfigWriter(store).Write(profile, null, null));
+    }
+
     [Theory]
     [InlineData("ssh.example.internal;ProxyCommand evil", "tester", 22)]
     [InlineData("ssh.example.internal", "tester;rm -rf /", 22)]
