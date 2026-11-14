@@ -1,0 +1,313 @@
+name: Hattrick SSH desktop and Azure smoke test
+
+on:
+  push:
+    branches:
+      - ci/azure-ssh-smoke
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hssh-azure-smoke
+  cancel-in-progress: false
+
+jobs:
+  desktop-simulation:
+    name: Windows desktop and ConPTY simulation
+    runs-on: windows-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout test branch
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: src/HattrickSSH/package.json
+
+      - name: Install terminal assets
+        working-directory: src/HattrickSSH
+        shell: pwsh
+        run: |
+          npm install --no-audit --no-fund
+          New-Item -ItemType Directory -Force wwwroot/lib | Out-Null
+          Copy-Item node_modules/@xterm/xterm/lib/xterm.js wwwroot/lib/xterm.js
+          Copy-Item node_modules/@xterm/xterm/css/xterm.css wwwroot/lib/xterm.css
+          Copy-Item node_modules/@xterm/addon-fit/lib/addon-fit.js wwwroot/lib/addon-fit.js
+
+      - name: Generate Windows app icon
+        shell: pwsh
+        run: ./scripts/generate-icon.ps1
+
+      - name: Restore
+        run: dotnet restore src/HattrickSSH/HattrickSSH.csproj
+
+      - name: Build WPF desktop application
+        id: build
+        run: dotnet build src/HattrickSSH/HattrickSSH.csproj -c Release --no-restore -p:Version=0.1.0
+
+      - name: Run persistence and ConPTY integration tests
+        id: tests
+        run: dotnet test tests/HattrickSSH.Persistence.Tests/HattrickSSH.Persistence.Tests.csproj -c Release --logger "console;verbosity=normal"
+
+      - name: Publish portable Windows x64 app
+        id: publish
+        shell: pwsh
+        run: |
+          dotnet publish src/HattrickSSH/HattrickSSH.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:Version=0.1.0 -o artifacts/publish
+          if (!(Test-Path artifacts/publish/HattrickSSH.exe)) { throw "Published HattrickSSH.exe is missing." }
+          Compress-Archive -Path artifacts/publish/* -DestinationPath artifacts/HattrickSSH-DesktopSimulation.zip -Force
+
+      - name: Upload desktop simulation package
+        if: steps.publish.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: HattrickSSH-DesktopSimulation
+          path: artifacts/HattrickSSH-DesktopSimulation.zip
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Write desktop simulation summary
+        if: always()
+        shell: pwsh
+        env:
+          BUILD_RESULT: ${{ steps.build.outcome }}
+          TEST_RESULT: ${{ steps.tests.outcome }}
+          PUBLISH_RESULT: ${{ steps.publish.outcome }}
+        run: |
+          @"
+          ### Desktop simulation
+          - WPF build: **$env:BUILD_RESULT**
+          - Persistence + ConPTY input/output/resize tests: **$env:TEST_RESULT**
+          - Self-contained x64 package: **$env:PUBLISH_RESULT**
+          - Note: this is a Windows CI/PTY simulation, not a screenshot or hands-on GUI test on a physical PC.
+          "@ | Add-Content $env:GITHUB_STEP_SUMMARY
+
+  azure-ssh-smoke:
+    name: Cloudflare Access and Azure SSH login
+    runs-on: windows-latest
+    timeout-minutes: 8
+    steps:
+      - name: Run protected SSH smoke test
+        id: ssh_test
+        shell: pwsh
+        env:
+          HSSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY || secrets.SSH_PRIVATE_KEY_PEM || secrets.AZURE_SSH_PRIVATE_KEY || secrets.AZURE_SSH_KEY }}
+          HSSH_PRIVATE_KEY_B64: ${{ secrets.SSH_PRIVATE_KEY_B64 || secrets.SSH_PRIVATE_KEY_BASE64 }}
+          HSSH_CF_ID: ${{ secrets.CLOUDFLARE_ACCESS_CLIENT_ID || secrets.CF_ACCESS_CLIENT_ID || secrets.TUNNEL_SERVICE_TOKEN_ID || secrets.CLOUDFLARE_SERVICE_TOKEN_ID }}
+          HSSH_CF_SECRET: ${{ secrets.CLOUDFLARE_ACCESS_CLIENT_SECRET || secrets.CF_ACCESS_CLIENT_SECRET || secrets.TUNNEL_SERVICE_TOKEN_SECRET || secrets.CLOUDFLARE_SERVICE_TOKEN_SECRET }}
+        run: |
+          $ErrorActionPreference = "Stop"
+          $report = [System.Collections.Generic.List[string]]::new()
+          $report.Add("# Hattrick SSH - Azure connection report")
+          $report.Add("")
+          $report.Add("- Target: `ssh.dinceryuk.com:22`")
+          $report.Add("- User: `azureuser`")
+          $report.Add("- Runner: GitHub-hosted Windows x64")
+          $report.Add("- Secrets: values are not written to logs, summaries, or artifacts.")
+          $report.Add("")
+          $failed = $false
+          $keyPath = Join-Path $env:RUNNER_TEMP "hssh-ci-identity"
+          $knownHosts = Join-Path $env:RUNNER_TEMP "hssh-ci-known-hosts"
+          $cloudflaredPath = Join-Path $env:RUNNER_TEMP "cloudflared.exe"
+          $reportPath = Join-Path $env:RUNNER_TEMP "hssh-azure-report.md"
+
+          try {
+            if ([string]::IsNullOrWhiteSpace($env:HSSH_PRIVATE_KEY) -and [string]::IsNullOrWhiteSpace($env:HSSH_PRIVATE_KEY_B64)) {
+              throw "SSH private-key secret missing. Add SSH_PRIVATE_KEY (or SSH_PRIVATE_KEY_PEM / AZURE_SSH_PRIVATE_KEY); a Base64 alternative is also supported."
+            }
+            if ([string]::IsNullOrWhiteSpace($env:HSSH_CF_ID) -or [string]::IsNullOrWhiteSpace($env:HSSH_CF_SECRET)) {
+              throw "Cloudflare Service Token secrets missing. Add CLOUDFLARE_ACCESS_CLIENT_ID and CLOUDFLARE_ACCESS_CLIENT_SECRET (or the supported aliases). The Access application must have a matching Service Auth policy."
+            }
+
+            if (-not [string]::IsNullOrWhiteSpace($env:HSSH_PRIVATE_KEY_B64)) {
+              $keyText = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($env:HSSH_PRIVATE_KEY_B64))
+            } else {
+              $keyText = $env:HSSH_PRIVATE_KEY
+            }
+            if ($keyText -notmatch "-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----") {
+              throw "The SSH private-key secret is not in PEM/OpenSSH private-key text format."
+            }
+            [IO.File]::WriteAllText($keyPath, $keyText, [Text.UTF8Encoding]::new($false))
+            $identity = [Security.Principal.WindowsIdentity]::GetCurrent().Name
+            & icacls.exe $keyPath /inheritance:r /grant:r ("{0}:(R)" -f $identity) "SYSTEM:(F)" | Out-Null
+            if ($LASTEXITCODE -ne 0) { throw "Could not restrict permissions on the temporary SSH key file." }
+            $keyText = $null
+
+            $env:CI = "true"
+            $env:TUNNEL_SERVICE_TOKEN_ID = $env:HSSH_CF_ID
+            $env:TUNNEL_SERVICE_TOKEN_SECRET = $env:HSSH_CF_SECRET
+
+            $downloadUrl = "https://github.com/cloudflare/cloudflared/releases/download/2026.11.0/cloudflared-windows-amd64.exe"
+            Invoke-WebRequest -Uri $downloadUrl -OutFile $cloudflaredPath
+            $expectedHash = "d5c1d82031da6253dcdcff64c944cd0fe063016edeb2e4fd088075fc9bd52d0a"
+            $actualHash = (Get-FileHash -LiteralPath $cloudflaredPath -Algorithm SHA256).Hash.ToLowerInvariant()
+            if ($actualHash -ne $expectedHash) { throw "cloudflared SHA-256 verification failed." }
+            $cloudflaredVersion = (& $cloudflaredPath --version 2>&1 | Out-String).Trim()
+            $report.Add("- cloudflared binary: **verified** (2026.11.0, SHA-256 matched)")
+            
+            $sshCommand = Get-Command ssh.exe -ErrorAction Stop
+            $sshArgs = @(
+              "-tt",
+              "-i", $keyPath,
+              "-p", "22",
+              "-o", "BatchMode=yes",
+              "-o", "IdentitiesOnly=yes",
+              "-o", "PreferredAuthentications=publickey",
+              "-o", "ConnectTimeout=25",
+              "-o", "ServerAliveInterval=10",
+              "-o", "ServerAliveCountMax=2",
+              "-o", "StrictHostKeyChecking=accept-new",
+              "-o", "UserKnownHostsFile=$knownHosts",
+              "-o", "LogLevel=ERROR",
+              "-o", "ProxyCommand=$cloudflaredPath access ssh --hostname %h",
+              "azureuser@ssh.dinceryuk.com"
+            )
+
+            $psi = [Diagnostics.ProcessStartInfo]::new()
+            $psi.FileName = $sshCommand.Source
+            $psi.UseShellExecute = $false
+            $psi.CreateNoWindow = $true
+            $psi.RedirectStandardInput = $true
+            $psi.RedirectStandardOutput = $true
+            $psi.RedirectStandardError = $true
+            foreach ($arg in $sshArgs) { [void]$psi.ArgumentList.Add($arg) }
+
+            $proc = [Diagnostics.Process]::new()
+            $proc.StartInfo = $psi
+            if (-not $proc.Start()) { throw "Could not start the OpenSSH client." }
+            $stdoutTask = $proc.StandardOutput.ReadToEndAsync()
+            $stderrTask = $proc.StandardError.ReadToEndAsync()
+
+            $proc.StandardInput.WriteLine("stty -echo")
+            $proc.StandardInput.Flush()
+            Start-Sleep -Milliseconds 500
+            $remoteCommands = @(
+              "printf '__HSSH_HOST__\n'; hostname; printf '__HSSH_HOST_RC=%s\n' `"$?`"",
+              "printf '__HSSH_USER__\n'; whoami; printf '__HSSH_USER_RC=%s\n' `"$?`"",
+              "printf '__HSSH_DF__\n'; df -h; printf '__HSSH_DF_RC=%s\n' `"$?`"",
+              "printf '__HSSH_FREE__\n'; free -h; printf '__HSSH_FREE_RC=%s\n' `"$?`"",
+              "printf '__HSSH_CLOUDFLARED_STATUS__\n'; sudo -n systemctl status cloudflared --no-pager 2>&1; printf '__HSSH_CF_RC=%s\n' `"$?`"",
+              "printf '__HSSH_DONE__\n'",
+              "exit 0"
+            )
+            foreach ($line in $remoteCommands) { $proc.StandardInput.WriteLine($line) }
+            $proc.StandardInput.Flush()
+            $proc.StandardInput.Close()
+
+            if (-not $proc.WaitForExit(90000)) {
+              try { $proc.Kill($true) } catch {}
+              throw "SSH connection or remote shell timed out after 90 seconds."
+            }
+            $stdout = $stdoutTask.GetAwaiter().GetResult()
+            $stderr = $stderrTask.GetAwaiter().GetResult()
+            $sshExitCode = $proc.ExitCode
+
+            $hostMatch = [regex]::Match($stdout, '(?m)^__HSSH_HOST__\r?\n([^\r\n]+)')
+            $userMatch = [regex]::Match($stdout, '(?m)^__HSSH_USER__\r?\n([^\r\n]+)')
+            $hostRc = [regex]::Match($stdout, '__HSSH_HOST_RC=(\d+)')
+            $userRc = [regex]::Match($stdout, '__HSSH_USER_RC=(\d+)')
+            $dfRc = [regex]::Match($stdout, '__HSSH_DF_RC=(\d+)')
+            $freeRc = [regex]::Match($stdout, '__HSSH_FREE_RC=(\d+)')
+            $cfRc = [regex]::Match($stdout, '__HSSH_CF_RC=(\d+)')
+
+            $remoteHostname = if ($hostMatch.Success) { $hostMatch.Groups[1].Value.Trim() } else { "" }
+            $remoteUser = if ($userMatch.Success) { $userMatch.Groups[1].Value.Trim() } else { "" }
+            $loginOk = ($sshExitCode -eq 0 -and $hostRc.Success -and $hostRc.Groups[1].Value -eq "0" -and $userRc.Success -and $userRc.Groups[1].Value -eq "0" -and $remoteUser -eq "azureuser" -and $stdout.Contains("__HSSH_DONE__"))
+            if (-not $loginOk) {
+              if ($stderr -match "Permission denied") { throw "SSH authentication failed: the server rejected the supplied key." }
+              if ($stderr -match "403|Access denied|Unauthorized|authentication") { throw "Cloudflare Access rejected the Service Token or the application policy." }
+              if ($stderr -match "websocket|web socket|proxy") { throw "Cloudflare proxy could not establish the SSH transport. Check Access policy, hostname, and cloudflared logs." }
+              if ($sshExitCode -ne 0) { throw "SSH session failed (exit code $sshExitCode). Check the Cloudflare/SSH policy and key." }
+              throw "The SSH session did not return the expected remote command markers."
+            }
+
+            $report.Add("- Cloudflare Access + SSH login: **PASS**")
+            $report.Add("- Interactive SSH PTY: **PASS** (forced terminal allocated)")
+            $report.Add("- `hostname`: **PASS** (value withheld from public CI output)")
+            $report.Add("- `whoami`: **PASS** (`azureuser`)")
+            $report.Add("- `df -h`: **$($(if ($dfRc.Success -and $dfRc.Groups[1].Value -eq '0') { 'PASS' } else { 'FAIL' }))** (filesystem output withheld)")
+            $report.Add("- `free -h`: **$($(if ($freeRc.Success -and $freeRc.Groups[1].Value -eq '0') { 'PASS' } else { 'FAIL' }))** (memory output withheld)")
+            if ($cfRc.Success -and $cfRc.Groups[1].Value -eq "0") {
+              $activeMatch = [regex]::Match($stdout, '(?m)^\s*Active:\s*([^\r\n]+)')
+              $serviceState = if ($activeMatch.Success) { $activeMatch.Groups[1].Value.Trim() } else { "status command succeeded" }
+              $report.Add("- `sudo -n systemctl status cloudflared`: **PASS** ($serviceState)")
+            } else {
+              $report.Add("- `sudo -n systemctl status cloudflared`: **CHECK** (status command ran, exit code $($cfRc.Groups[1].Value); sudo may require a password or the service may be inactive)")
+            }
+            if (Test-Path $knownHosts) {
+              $fingerprint = (& ssh-keygen.exe -lf $knownHosts -E sha256 2>$null | Select-Object -First 1)
+              if ($fingerprint) { $report.Add("- First-use SSH host fingerprint: `$fingerprint`") }
+            }
+            $report.Add("")
+            $report.Add("> Host-key checking was enabled with `StrictHostKeyChecking=accept-new` for this one-time ephemeral runner. No previously trusted fingerprint was available to pin.")
+
+            # A second PTY session verifies that Ctrl+C reaches the remote foreground process.
+            $ctrlPsi = [Diagnostics.ProcessStartInfo]::new()
+            $ctrlPsi.FileName = $sshCommand.Source
+            $ctrlPsi.UseShellExecute = $false
+            $ctrlPsi.CreateNoWindow = $true
+            $ctrlPsi.RedirectStandardInput = $true
+            $ctrlPsi.RedirectStandardOutput = $true
+            $ctrlPsi.RedirectStandardError = $true
+            foreach ($arg in $sshArgs) { [void]$ctrlPsi.ArgumentList.Add($arg) }
+            $ctrlProc = [Diagnostics.Process]::new()
+            $ctrlProc.StartInfo = $ctrlPsi
+            if (-not $ctrlProc.Start()) { throw "Could not start the Ctrl+C PTY test." }
+            $ctrlOutTask = $ctrlProc.StandardOutput.ReadToEndAsync()
+            $ctrlErrTask = $ctrlProc.StandardError.ReadToEndAsync()
+            $ctrlProc.StandardInput.WriteLine("stty -echo")
+            $ctrlProc.StandardInput.Flush()
+            Start-Sleep -Milliseconds 500
+            $ctrlProc.StandardInput.WriteLine("sleep 30")
+            $ctrlProc.StandardInput.Flush()
+            Start-Sleep -Seconds 2
+            $ctrlProc.StandardInput.Write([char]3)
+            $ctrlProc.StandardInput.Flush()
+            Start-Sleep -Milliseconds 400
+            $ctrlProc.StandardInput.WriteLine("printf '__HSSH_CTRL_C_OK__\n'")
+            $ctrlProc.StandardInput.WriteLine("exit 0")
+            $ctrlProc.StandardInput.Flush()
+            $ctrlProc.StandardInput.Close()
+            if (-not $ctrlProc.WaitForExit(15000)) {
+              try { $ctrlProc.Kill($true) } catch {}
+              throw "Ctrl+C PTY test timed out; the foreground sleep process did not return."
+            }
+            $ctrlOut = $ctrlOutTask.GetAwaiter().GetResult()
+            $null = $ctrlErrTask.GetAwaiter().GetResult()
+            if ($ctrlProc.ExitCode -ne 0 -or -not $ctrlOut.Contains("__HSSH_CTRL_C_OK__")) {
+              throw "Ctrl+C was not confirmed by the remote PTY session."
+            }
+            $report.Add("- Remote PTY Ctrl+C: **PASS**")
+            $report.Add("")
+            $report.Add("- Overall Azure SSH smoke test: **PASS**")
+            Write-Host "Azure SSH smoke test passed. Remote command output is intentionally withheld from public logs."
+          }
+          catch {
+            $failed = $true
+            $safeError = $_.Exception.Message
+            $report.Add("- Overall Azure SSH smoke test: **FAIL**")
+            $report.Add("- Failure: $safeError")
+            Write-Host "Azure SSH smoke test failed: $safeError"
+          }
+          finally {
+            $env:TUNNEL_SERVICE_TOKEN_ID = $null
+            $env:TUNNEL_SERVICE_TOKEN_SECRET = $null
+            $env:HSSH_PRIVATE_KEY = $null
+            $env:HSSH_PRIVATE_KEY_B64 = $null
+            if (Test-Path $keyPath) { Remove-Item -LiteralPath $keyPath -Force -ErrorAction SilentlyContinue }
+            if (Test-Path $knownHosts) { Remove-Item -LiteralPath $knownHosts -Force -ErrorAction SilentlyContinue }
+            $report | Out-File -LiteralPath $reportPath -Encoding utf8
+            Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY -Value ($report -join [Environment]::NewLine)
+          }
+
+          if ($failed) { exit 1 }
+
