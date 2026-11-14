@@ -435,7 +435,7 @@ public partial class MainWindow : Window
                     _ = Task.Run(async () =>
                     {
                         await Task.Delay(TimeSpan.FromSeconds(Math.Min(2 * attemptNumber, 6)));
-                        Dispatcher.BeginInvoke(new Action(() =>
+                        _ = Dispatcher.BeginInvoke(new Action(() =>
                         {
                             if (!closing && session is null && SelectedProfile?.Id == profile.Id)
                                 _ = ConnectSelectedAsync(sftp, automatic: true);
