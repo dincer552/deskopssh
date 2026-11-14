@@ -47,14 +47,29 @@ public sealed class SecureKeyStore(LocalStore store)
     {
         var path = Path.Combine(store.KeyDirectory, keyId + ".dpapi");
         if (!File.Exists(path)) throw new FileNotFoundException("Kayıtlı SSH anahtarı bulunamadı.");
-        var clear = ProtectedData.Unprotect(File.ReadAllBytes(path), Entropy, DataProtectionScope.CurrentUser);
+        var encrypted = File.ReadAllBytes(path);
+        byte[] clear;
+        try
+        {
+            clear = ProtectedData.Unprotect(encrypted, Entropy, DataProtectionScope.CurrentUser);
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(encrypted);
+        }
+
         var folder = Path.Combine(Path.GetTempPath(), "HattrickSSH", Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(folder);
         var tempPath = Path.Combine(folder, "identity.key");
         try
         {
-            File.WriteAllBytes(tempPath, clear);
+            using (new FileStream(tempPath, FileMode.CreateNew, FileAccess.Write, FileShare.None)) { }
             RestrictFilePermissions(tempPath);
+            using (var output = new FileStream(tempPath, FileMode.Open, FileAccess.Write, FileShare.None))
+            {
+                output.Write(clear, 0, clear.Length);
+                output.Flush(flushToDisk: true);
+            }
             return tempPath;
         }
         catch
@@ -99,7 +114,11 @@ public sealed class SecureKeyStore(LocalStore store)
         start.ArgumentList.Add(identity + ":(R)");
         start.ArgumentList.Add("SYSTEM:(F)");
         using var process = System.Diagnostics.Process.Start(start) ?? throw new InvalidOperationException("icacls başlatılamadı.");
-        process.WaitForExit(5000);
+        if (!process.WaitForExit(5000))
+        {
+            try { process.Kill(entireProcessTree: true); } catch { }
+            throw new TimeoutException("SSH anahtar dosyası izinleri zamanında ayarlanamadı.");
+        }
         if (process.ExitCode != 0)
             throw new InvalidOperationException("SSH anahtar dosyası Windows kullanıcı izinleriyle korunamadı.");
     }

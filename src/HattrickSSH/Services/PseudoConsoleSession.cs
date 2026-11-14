@@ -16,6 +16,7 @@ public sealed class PseudoConsoleSession : IDisposable
     private readonly FileStream output;
     private readonly object writeLock = new();
     private bool disposed;
+    private int monitoringStarted;
 
     public event Action<byte[]>? OutputReceived;
     public event Action<int>? Exited;
@@ -26,6 +27,11 @@ public sealed class PseudoConsoleSession : IDisposable
         this.processHandle = processHandle;
         input = new FileStream(inputWrite, FileAccess.Write, 4096, false);
         output = new FileStream(outputRead, FileAccess.Read, 8192, false);
+    }
+
+    public void StartMonitoring()
+    {
+        if (Interlocked.Exchange(ref monitoringStarted, 1) != 0) return;
         _ = Task.Run(ReadOutputAsync);
         _ = Task.Run(WaitForExit);
     }

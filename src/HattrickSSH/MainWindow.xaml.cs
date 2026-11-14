@@ -399,11 +399,17 @@ public partial class MainWindow : Window
             session = PseudoConsoleSession.Start(ssh, args, 120, 34);
             var startedSession = session;
             var historyEntry = activeHistoryEntry!;
+            var firstOutputReceived = 0;
             startedSession.OutputReceived += bytes =>
             {
                 var base64 = Convert.ToBase64String(bytes);
                 Dispatcher.BeginInvoke(new Action(() =>
                 {
+                    if (Interlocked.Exchange(ref firstOutputReceived, 1) == 0 && ReferenceEquals(session, startedSession))
+                    {
+                        ConnectionStatus.Text = "● SSH yanıtı alındı • host/kimlik doğrulamasını tamamlayın";
+                        FooterRight.Text = "SSH yanıtı alınıyor";
+                    }
                     if (TerminalWeb.CoreWebView2 is not null)
                         TerminalWeb.CoreWebView2.PostWebMessageAsString(base64);
                 }));
@@ -441,14 +447,15 @@ public partial class MainWindow : Window
                     reconnectAttempts = 0;
                 }
             }));
+            startedSession.StartMonitoring();
 
-            ConnectionDot.Fill = (Brush)FindResource("GreenBrush");
+            ConnectionDot.Fill = Brushes.Goldenrod;
             ConnectionStatus.Text = profile.UseCloudflareAccess
-                ? "● cloudflared + OpenSSH " + (sftp ? "SFTP" : "SSH") + " çalışıyor • doğrulama terminalde"
-                : "● OpenSSH " + (sftp ? "SFTP" : "SSH") + " çalışıyor • el sıkışması bekleniyor";
-            if (activeHistoryEntry is not null) activeHistoryEntry.Status = "SSH süreci başlatıldı";
+                ? "● SSH süreci başlatıldı • Cloudflare Access / SSH doğrulaması bekleniyor"
+                : "● SSH süreci başlatıldı • host key / kullanıcı doğrulaması bekleniyor";
+            if (activeHistoryEntry is not null) activeHistoryEntry.Status = "SSH süreci başladı; doğrulama bekleniyor";
             SaveHistory();
-            FooterRight.Text = "● Terminal süreci açık";
+            FooterRight.Text = "Kimlik doğrulaması bekleniyor";
             await WriteTerminalAsync(sftp
                 ? "[SFTP] Windows ConPTY üzerinden gerçek OpenSSH SFTP oturumu başlatıldı. ls, cd, get, put komutlarını kullanabilirsiniz.\r\n"
                 : "[PTY] Windows ConPTY oluşturuldu. SSH istemcisi gerçek interaktif shell açıyor.\r\n");
@@ -564,7 +571,7 @@ public partial class MainWindow : Window
             MessageBox.Show("Önce SSH veya SFTP oturumu açın.", "Bağlantı yok", MessageBoxButton.OK, MessageBoxImage.Information);
             return;
         }
-        session.WriteInput(selected.Command + "\\r");
+        session.WriteInput(selected.Command + "\r");
         ServerWorkspace.Visibility = Visibility.Visible;
         SettingsWorkspace.Visibility = Visibility.Collapsed;
         UpdatesWorkspace.Visibility = Visibility.Collapsed;
@@ -897,6 +904,7 @@ public partial class MainWindow : Window
                 activeTunnels.Remove(entry);
                 _ = WriteTerminalAsync($"\r\n[TUNNEL] {entry.Label} kapandı (çıkış kodu {code}).\r\n");
             }));
+            started.StartMonitoring();
             await WriteTerminalAsync($"\r\n[TUNNEL] {entry.Label}\r\n[TUNNEL] SSH tünel süreci başlatıldı ({modeFlag}).\r\n");
         }
         catch (Exception ex)

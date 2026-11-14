@@ -17,7 +17,7 @@ public sealed class SshConfigWriterTests : IDisposable
         var store = CreateStore();
         var profile = new ServerProfile
         {
-            Id = "test-profile",
+            Id = Guid.NewGuid().ToString("N"),
             Host = "ssh.example.internal",
             Username = "tester",
             Port = 22
@@ -38,7 +38,7 @@ public sealed class SshConfigWriterTests : IDisposable
         var store = CreateStore();
         var profile = new ServerProfile
         {
-            Id = "cloudflare-profile",
+            Id = Guid.NewGuid().ToString("N"),
             Host = "ssh.example.internal",
             Username = "tester",
             Port = 22,
@@ -79,7 +79,7 @@ public sealed class SshConfigWriterTests : IDisposable
         var store = CreateStore();
         var profile = new ServerProfile
         {
-            Id = "invalid-profile",
+            Id = Guid.NewGuid().ToString("N"),
             Host = host,
             Username = username,
             Port = port
@@ -94,7 +94,7 @@ public sealed class SshConfigWriterTests : IDisposable
         var store = CreateStore();
         var profile = new ServerProfile
         {
-            Id = "missing-cloudflared",
+            Id = Guid.NewGuid().ToString("N"),
             Host = "ssh.example.internal",
             Username = "tester",
             UseCloudflareAccess = true
