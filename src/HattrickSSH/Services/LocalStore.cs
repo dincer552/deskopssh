@@ -6,8 +6,7 @@ namespace HattrickSSH.Services;
 public sealed class LocalStore
 {
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
-    public string RootPath { get; } = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "HattrickSSH");
+    public string RootPath { get; }
     public string KnownHostsPath => Path.Combine(RootPath, "known_hosts");
     public string KeyDirectory => Path.Combine(RootPath, "keys");
 
@@ -15,8 +14,12 @@ public sealed class LocalStore
     private string SettingsPath => Path.Combine(RootPath, "settings.json");
     private string HistoryPath => Path.Combine(RootPath, "connection-history.json");
 
-    public LocalStore()
+    public LocalStore(string? rootPath = null)
     {
+        RootPath = string.IsNullOrWhiteSpace(rootPath)
+            ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "HattrickSSH")
+            : Path.GetFullPath(rootPath);
+
         Directory.CreateDirectory(RootPath);
         Directory.CreateDirectory(KeyDirectory);
         if (!File.Exists(KnownHostsPath)) File.WriteAllText(KnownHostsPath, "");
@@ -35,7 +38,7 @@ public sealed class LocalStore
             new ServerProfile
             {
                 Name = "Azure • hattrick-vm",
-                Host = "ssh.dinceryuksek.com",
+                Host = "ssh.dinceryuk.com",
                 Port = 22,
                 Username = "azureuser",
                 UseCloudflareAccess = true
@@ -71,6 +74,12 @@ public sealed class LocalStore
         return [];
     }
 
-    public void SaveHistory(IEnumerable<ConnectionHistoryEntry> history) =>
-        File.WriteAllText(HistoryPath, JsonSerializer.Serialize(history.Take(100), JsonOptions));
+    public void SaveHistory(IEnumerable<ConnectionHistoryEntry> history)
+    {
+        var latestEntries = history
+            .OrderByDescending(entry => entry.StartedAtUtc)
+            .Take(100)
+            .ToList();
+        File.WriteAllText(HistoryPath, JsonSerializer.Serialize(latestEntries, JsonOptions));
+    }
 }
