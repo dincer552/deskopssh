@@ -109,8 +109,8 @@ jobs:
           $report = [System.Collections.Generic.List[string]]::new()
           $report.Add("# Hattrick SSH - Azure connection report")
           $report.Add("")
-          $report.Add("- Target: `ssh.dinceryuk.com:22`")
-          $report.Add("- User: `azureuser`")
+          $report.Add("- Target: ssh.dinceryuk.com:22")
+          $report.Add("- User: azureuser")
           $report.Add("- Runner: GitHub-hosted Windows x64")
           $report.Add("- Secrets: values are not written to logs, summaries, or artifacts.")
           $report.Add("")
@@ -232,25 +232,25 @@ jobs:
 
             $report.Add("- Cloudflare Access + SSH login: **PASS**")
             $report.Add("- Interactive SSH PTY: **PASS** (forced terminal allocated)")
-            $report.Add("- `hostname`: **PASS** (value withheld from public CI output)")
-            $report.Add("- `whoami`: **PASS** (`azureuser`)")
+            $report.Add("- hostname: **PASS** (value withheld from public CI output)")
+            $report.Add("- whoami: **PASS** (azureuser)")
             $dfStatus = if ($dfRc.Success -and $dfRc.Groups[1].Value -eq "0") { "PASS" } else { "FAIL" }
             $freeStatus = if ($freeRc.Success -and $freeRc.Groups[1].Value -eq "0") { "PASS" } else { "FAIL" }
-            $report.Add("- `df -h`: **$dfStatus** (filesystem output withheld)")
-            $report.Add("- `free -h`: **$freeStatus** (memory output withheld)")
+            $report.Add("- df -h: **$dfStatus** (filesystem output withheld)")
+            $report.Add("- free -h: **$freeStatus** (memory output withheld)")
             if ($cfRc.Success -and $cfRc.Groups[1].Value -eq "0") {
               $activeMatch = [regex]::Match($stdout, '(?m)^\s*Active:\s*([^\r\n]+)')
               $serviceState = if ($activeMatch.Success) { $activeMatch.Groups[1].Value.Trim() } else { "status command succeeded" }
-              $report.Add("- `sudo -n systemctl status cloudflared`: **PASS** ($serviceState)")
+              $report.Add("- sudo -n systemctl status cloudflared: **PASS** ($serviceState)")
             } else {
-              $report.Add("- `sudo -n systemctl status cloudflared`: **CHECK** (status command ran, exit code $($cfRc.Groups[1].Value); sudo may require a password or the service may be inactive)")
+              $report.Add("- sudo -n systemctl status cloudflared: **CHECK** (status command ran, exit code $($cfRc.Groups[1].Value); sudo may require a password or the service may be inactive)")
             }
             if (Test-Path $knownHosts) {
               $fingerprint = (& ssh-keygen.exe -lf $knownHosts -E sha256 2>$null | Select-Object -First 1)
               if ($fingerprint) { $report.Add(('- First-use SSH host fingerprint: `{0}`' -f $fingerprint)) }
             }
             $report.Add("")
-            $report.Add("> Host-key checking was enabled with `StrictHostKeyChecking=accept-new` for this one-time ephemeral runner. No previously trusted fingerprint was available to pin.")
+            $report.Add("> Host-key checking was enabled with StrictHostKeyChecking=accept-new for this one-time ephemeral runner. No previously trusted fingerprint was available to pin.")
 
             # A second PTY session verifies that Ctrl+C reaches the remote foreground process.
             $ctrlPsi = [Diagnostics.ProcessStartInfo]::new()
