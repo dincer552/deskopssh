@@ -221,7 +221,7 @@ jobs:
 
             $remoteHostname = if ($hostMatch.Success) { $hostMatch.Groups[1].Value.Trim() } else { "" }
             $remoteUser = if ($userMatch.Success) { $userMatch.Groups[1].Value.Trim() } else { "" }
-            $loginOk = ($sshExitCode -eq 0 -and $hostRc.Success -and $hostRc.Groups[1].Value -eq "0" -and $userRc.Success -and $userRc.Groups[1].Value -eq "0" -and $remoteUser -eq "azureuser" -and $stdout.Contains("__HSSH_DONE__"))
+            $loginOk = ($sshExitCode -eq 0 -and $hostRc.Success -and $hostRc.Groups[1].Value -eq "0" -and $remoteHostname.Length -gt 0 -and $userRc.Success -and $userRc.Groups[1].Value -eq "0" -and $remoteUser -eq "azureuser" -and $dfRc.Success -and $dfRc.Groups[1].Value -eq "0" -and $freeRc.Success -and $freeRc.Groups[1].Value -eq "0" -and $stdout.Contains("__HSSH_DONE__"))
             if (-not $loginOk) {
               if ($stderr -match "Permission denied") { throw "SSH authentication failed: the server rejected the supplied key." }
               if ($stderr -match "403|Access denied|Unauthorized|authentication") { throw "Cloudflare Access rejected the Service Token or the application policy." }
@@ -234,8 +234,10 @@ jobs:
             $report.Add("- Interactive SSH PTY: **PASS** (forced terminal allocated)")
             $report.Add("- `hostname`: **PASS** (value withheld from public CI output)")
             $report.Add("- `whoami`: **PASS** (`azureuser`)")
-            $report.Add("- `df -h`: **$($(if ($dfRc.Success -and $dfRc.Groups[1].Value -eq '0') { 'PASS' } else { 'FAIL' }))** (filesystem output withheld)")
-            $report.Add("- `free -h`: **$($(if ($freeRc.Success -and $freeRc.Groups[1].Value -eq '0') { 'PASS' } else { 'FAIL' }))** (memory output withheld)")
+            $dfStatus = if ($dfRc.Success -and $dfRc.Groups[1].Value -eq "0") { "PASS" } else { "FAIL" }
+            $freeStatus = if ($freeRc.Success -and $freeRc.Groups[1].Value -eq "0") { "PASS" } else { "FAIL" }
+            $report.Add("- `df -h`: **$dfStatus** (filesystem output withheld)")
+            $report.Add("- `free -h`: **$freeStatus** (memory output withheld)")
             if ($cfRc.Success -and $cfRc.Groups[1].Value -eq "0") {
               $activeMatch = [regex]::Match($stdout, '(?m)^\s*Active:\s*([^\r\n]+)')
               $serviceState = if ($activeMatch.Success) { $activeMatch.Groups[1].Value.Trim() } else { "status command succeeded" }
@@ -245,7 +247,7 @@ jobs:
             }
             if (Test-Path $knownHosts) {
               $fingerprint = (& ssh-keygen.exe -lf $knownHosts -E sha256 2>$null | Select-Object -First 1)
-              if ($fingerprint) { $report.Add("- First-use SSH host fingerprint: `$fingerprint`") }
+              if ($fingerprint) { $report.Add(('- First-use SSH host fingerprint: `{0}`' -f $fingerprint)) }
             }
             $report.Add("")
             $report.Add("> Host-key checking was enabled with `StrictHostKeyChecking=accept-new` for this one-time ephemeral runner. No previously trusted fingerprint was available to pin.")
