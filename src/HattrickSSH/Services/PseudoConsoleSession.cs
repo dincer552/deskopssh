@@ -41,9 +41,15 @@ public sealed class PseudoConsoleSession : IDisposable
         if (!OperatingSystem.IsWindowsVersionAtLeast(10, 0, 17763))
             throw new PlatformNotSupportedException("Windows ConPTY için Windows 10 sürüm 1809 veya üzeri gerekiyor.");
 
-        var security = new SECURITY_ATTRIBUTES { nLength = Marshal.SizeOf<SECURITY_ATTRIBUTES>(), bInheritHandle = true };
-        CreatePipe(out var inputRead, out var inputWrite, ref security, 0);
-        CreatePipe(out var outputRead, out var outputWrite, ref security, 0);
+        // Match the native ConPTY sample: anonymous pipe handles are not inheritable.
+        if (!CreatePipe(out var inputRead, out var inputWrite, IntPtr.Zero, 0))
+            throw new Win32Exception(Marshal.GetLastWin32Error(), "Could not create ConPTY input pipe.");
+        if (!CreatePipe(out var outputRead, out var outputWrite, IntPtr.Zero, 0))
+        {
+            inputRead.Dispose();
+            inputWrite.Dispose();
+            throw new Win32Exception(Marshal.GetLastWin32Error(), "Could not create ConPTY output pipe.");
+        }
 
         IntPtr hpc = IntPtr.Zero;
         IntPtr process = IntPtr.Zero;
@@ -178,12 +184,12 @@ public sealed class PseudoConsoleSession : IDisposable
         }
     }
 
-    private static string Quote(string value) => "\"" + value.Replace("\\", "\\\\").Replace("\"", "\\\"") + "\"";
+    // Executable paths cannot contain quotes. Do not double backslashes here:
+    // Windows command-line parsing treats ordinary backslashes literally.
+    private static string Quote(string value) => "\"" + value + "\"";
 
     [StructLayout(LayoutKind.Sequential)]
     private struct COORD(short x, short y) { public short X = x; public short Y = y; }
-    [StructLayout(LayoutKind.Sequential)]
-    private struct SECURITY_ATTRIBUTES { public int nLength; public IntPtr lpSecurityDescriptor; public bool bInheritHandle; }
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
     private struct STARTUPINFO
     {
@@ -197,7 +203,7 @@ public sealed class PseudoConsoleSession : IDisposable
     [StructLayout(LayoutKind.Sequential)]
     private struct PROCESS_INFORMATION { public IntPtr hProcess; public IntPtr hThread; public uint dwProcessId; public uint dwThreadId; }
 
-    [DllImport("kernel32.dll", SetLastError = true)] private static extern bool CreatePipe(out SafeFileHandle hReadPipe, out SafeFileHandle hWritePipe, ref SECURITY_ATTRIBUTES attributes, int size);
+    [DllImport("kernel32.dll", SetLastError = true)] private static extern bool CreatePipe(out SafeFileHandle hReadPipe, out SafeFileHandle hWritePipe, IntPtr attributes, int size);
     [DllImport("kernel32.dll", SetLastError = true)] private static extern int CreatePseudoConsole(COORD size, SafeFileHandle input, SafeFileHandle output, uint flags, out IntPtr console);
     [DllImport("kernel32.dll", SetLastError = true)] private static extern int ResizePseudoConsole(IntPtr console, COORD size);
     [DllImport("kernel32.dll")] private static extern void ClosePseudoConsole(IntPtr console);
